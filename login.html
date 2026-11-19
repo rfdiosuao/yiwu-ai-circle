@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>入场登记 · 义乌AI圈</title>
+<meta name="description" content="义乌AI圈入场登记：手机号验证码登录、密码登录，一个号码打通社区、AI 工具与商家。">
+<link rel="icon" type="image/png" href="assets/img/logo-icon.png?v=2">
+<link rel="stylesheet" href="assets/css/styles.css">
+<link rel="stylesheet" href="assets/css/auth.css">
+</head>
+<body>
+
+<div class="auth">
+
+  <!-- ================= BRAND SIDE ================= -->
+  <aside class="auth__aside">
+    <a class="brand" href="index.html" aria-label="义乌AI圈首页">
+      <img class="brand__logo brand__logo--light" src="assets/img/logo-light.png?v=2" alt="义乌AI圈">
+    </a>
+
+    <span class="auth__seal">会员<br>入口</span>
+
+    <div class="auth__aside-body">
+      <p class="auth__slogan">一鼓通天下，智联新义乌。</p>
+      <div class="auth__kicker">Member entry · 手机号即身份</div>
+      <h1 class="auth__display">
+        入场.
+        <span class="outline">Walk in.</span>
+      </h1>
+      <p class="auth__quote">在义乌，没有人问你从哪里来，<br>只问你什么时候发货。</p>
+
+      <div class="auth__figures">
+        <div class="auth__fig"><b>12,847</b><span>位经营者</span></div>
+        <div class="auth__fig"><b>8</b><span>认证商家</span></div>
+        <div class="auth__fig"><b>04</b><span>线下据点</span></div>
+      </div>
+    </div>
+
+    <div class="auth__aside-foot">
+      <span>Yiwu · 30.87°N 120.07°E</span>
+      <span>Est. 2026 / Demo build 0.1</span>
+    </div>
+  </aside>
+
+  <!-- ================= FORM SIDE ================= -->
+  <section class="auth__panel">
+    <div class="auth__panel-top">
+      <a class="auth__back" href="index.html">← 返回首页</a>
+      <a href="legal.html#guide">需要帮助？</a>
+    </div>
+
+    <div class="auth__sheet">
+      <h2 class="auth__title">入场登记 <em>/ Entry</em></h2>
+      <p class="auth__desc">一个手机号，接通义乌的供应链、AI 工具与同行。没注册过的号码会自动创建账号。</p>
+
+      <div class="auth__tabs" role="tablist" aria-label="登录方式">
+        <button class="auth__tab" type="button" role="tab" data-tab="otp" aria-selected="true">验证码登录</button>
+        <button class="auth__tab" type="button" role="tab" data-tab="pw" aria-selected="false">密码登录</button>
+      </div>
+
+      <!-- ---------- STEP 1 · OTP ---------- -->
+      <form class="auth-form auth-step is-on" data-step="otp" novalidate>
+        <div class="field">
+          <label class="label" for="loginPhone">手机号 <span>China +86</span></label>
+          <div class="phone-field">
+            <span class="phone-field__pre">+86
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+            </span>
+            <input id="loginPhone" name="phone" type="tel" inputmode="numeric" autocomplete="tel"
+                   maxlength="11" placeholder="请输入 11 位手机号" aria-describedby="phoneErr"
+                   data-phone data-field="phone">
+            <button class="phone-field__clear" type="button" data-clear-phone aria-label="清空手机号">✕</button>
+          </div>
+          <p class="field-error" id="phoneErr" data-error="phone" role="alert"></p>
+        </div>
+
+        <div class="field">
+          <div class="label">
+            <span>短信验证码</span>
+            <button class="otp-send" type="button" data-send-code>获取验证码</button>
+          </div>
+          <div class="otp" data-otp data-field="code">
+            <input class="otp__box" type="text" inputmode="numeric" maxlength="1" placeholder="·" aria-label="验证码第 1 位">
+            <input class="otp__box" type="text" inputmode="numeric" maxlength="1" placeholder="·" aria-label="验证码第 2 位">
+            <input class="otp__box" type="text" inputmode="numeric" maxlength="1" placeholder="·" aria-label="验证码第 3 位">
+            <input class="otp__box" type="text" inputmode="numeric" maxlength="1" placeholder="·" aria-label="验证码第 4 位">
+            <input class="otp__box" type="text" inputmode="numeric" maxlength="1" placeholder="·" aria-label="验证码第 5 位">
+            <input class="otp__box" type="text" inputmode="numeric" maxlength="1" placeholder="·" aria-label="验证码第 6 位">
+          </div>
+          <p class="field-error" data-error="code" role="alert"></p>
+        </div>
+
+        <div class="auth-meta">
+          <label class="checkline">
+            <input type="checkbox" data-terms>
+            <span class="checkline__box"></span>
+            <span>我已阅读并同意 <a href="legal.html#terms" target="_blank" rel="noopener">《用户协议》</a> 与 <a href="legal.html#privacy" target="_blank" rel="noopener">《隐私政策》</a></span>
+          </label>
+        </div>
+
+        <div class="auth-status" data-status role="alert" aria-live="polite"></div>
+
+        <button class="btn btn--red btn--block auth-submit" type="submit" data-submit>
+          <span class="spinner" aria-hidden="true"></span>
+          <span class="label">登录 / 注册</span>
+        </button>
+      </form>
+
+      <!-- ---------- STEP 2 · PASSWORD ---------- -->
+      <form class="auth-form auth-step" data-step="pw" novalidate>
+        <div class="field">
+          <label class="label" for="pwPhone">手机号 <span>China +86</span></label>
+          <div class="phone-field">
+            <span class="phone-field__pre">+86
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+            </span>
+            <input id="pwPhone" name="phone" type="tel" inputmode="numeric" autocomplete="username"
+                   maxlength="11" placeholder="请输入 11 位手机号"
+                   data-phone data-field="phone">
+            <button class="phone-field__clear" type="button" data-clear-phone aria-label="清空手机号">✕</button>
+          </div>
+          <p class="field-error" data-error="phone" role="alert"></p>
+        </div>
+
+        <div class="field">
+          <label class="label" for="loginPw">密码 <span>Password</span></label>
+          <div class="pw-wrap">
+            <input class="input" id="loginPw" name="password" type="password" autocomplete="current-password"
+                   placeholder="请输入密码" data-password data-field="password">
+            <button class="pw-toggle" type="button" data-pw-toggle>显示</button>
+          </div>
+          <span class="caps-hint" data-caps>Caps Lock 已开启</span>
+          <p class="field-error" data-error="password" role="alert"></p>
+        </div>
+
+        <div class="auth-meta">
+          <label class="checkline">
+            <input type="checkbox" data-remember checked>
+            <span class="checkline__box"></span>
+            <span>30 天内免登录</span>
+          </label>
+          <button class="auth-help" type="button" data-forgot>忘记密码？</button>
+        </div>
+
+        <div class="auth-status" data-status role="alert" aria-live="polite"></div>
+
+        <button class="btn btn--red btn--block auth-submit" type="submit" data-submit>
+          <span class="spinner" aria-hidden="true"></span>
+          <span class="label">密码登录</span>
+        </button>
+      </form>
+
+      <!-- ---------- STEP 3 · PROFILE ---------- -->
+      <form class="auth-form auth-step" data-step="profile" novalidate>
+        <div class="auth-status is-on is-ok" data-status role="status">
+          <span class="auth-status__icon">✓</span><span>手机号验证通过。</span>
+        </div>
+
+        <div class="field">
+          <label class="label" for="nickname">昵称 <span data-nick-phone>+86</span></label>
+          <input class="input" id="nickname" type="text" data-nickname data-field="nickname"
+                 placeholder="圈子里怎么称呼你？" maxlength="14" autocomplete="nickname">
+          <p class="field-error" data-error="nickname" role="alert"></p>
+        </div>
+
+        <div class="field">
+          <label class="label" for="newPw">设置密码 <span>可选 · 也可只用验证码</span></label>
+          <div class="pw-wrap">
+            <input class="input" id="newPw" type="password" data-new-password data-field="newPassword"
+                   placeholder="至少 8 位，需含字母与数字" autocomplete="new-password">
+            <button class="pw-toggle" type="button" data-pw-toggle>显示</button>
+          </div>
+          <div class="strength" data-strength data-level="0">
+            <div class="strength__bars"><i></i><i></i><i></i><i></i></div>
+            <div class="strength__label"><span>密码强度</span><span data-strength-label>未设置</span></div>
+          </div>
+          <p class="field-error" data-error="newPassword" role="alert"></p>
+        </div>
+
+        <button class="btn btn--red btn--block auth-submit" type="submit" data-submit>
+          <span class="spinner" aria-hidden="true"></span>
+          <span class="label">完成注册 · 入场</span>
+        </button>
+      </form>
+
+      <!-- ---------- STEP 4 · DONE ---------- -->
+      <div class="auth-step" data-step="done">
+        <div class="auth-done">
+          <div class="auth-done__seal">已入场</div>
+          <h3>欢迎，<span data-done-name>圈友</span></h3>
+          <p data-done-phone>+86 138****0000</p>
+          <a class="btn btn--red btn--block" href="index.html" data-done-go>进入圈子 <span class="arrow">→</span></a>
+          <button class="auth-help" type="button" data-done-another style="margin-top:18px">换个账号登录</button>
+        </div>
+      </div>
+
+      <div class="auth-div">或</div>
+
+      <div class="socials">
+        <button class="social-btn" type="button" data-social="微信">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9.2 3C5.2 3 2 5.7 2 9c0 1.9 1 3.6 2.7 4.7l-.7 2.1 2.5-1.2c.9.3 1.8.4 2.7.4h.5a5.6 5.6 0 0 1-.2-1.5c0-3.1 3-5.6 6.7-5.6h.4C15.9 5.2 12.9 3 9.2 3Zm-2.4 3.4c.5 0 .9.4.9.9s-.4.9-.9.9-.9-.4-.9-.9.4-.9.9-.9Zm4.9 0c.5 0 .9.4.9.9s-.4.9-.9.9-.9-.4-.9-.9.4-.9.9-.9Z"/><path d="M22 13.5c0-2.6-2.6-4.7-5.7-4.7S10.6 10.9 10.6 13.5s2.6 4.7 5.7 4.7c.7 0 1.3-.1 1.9-.3l2 1-.6-1.7c1.5-.9 2.4-2.2 2.4-3.7Zm-7.6-1.6c.4 0 .7.3.7.7s-.3.7-.7.7-.7-.3-.7-.7.3-.7.7-.7Zm3.8 0c.4 0 .7.3.7.7s-.3.7-.7.7-.7-.3-.7-.7.3-.7.7-.7Z"/></svg>
+          微信登录
+        </button>
+        <button class="social-btn" type="button" data-social="企业微信">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2 3 6v6c0 5 3.8 8.7 9 10 5.2-1.3 9-5 9-10V6l-9-4Zm0 4.2 5 2.2v3.4c0 3.4-2.2 5.9-5 7-2.8-1.1-5-3.6-5-7V8.4l5-2.2Z"/></svg>
+          企业微信
+        </button>
+      </div>
+
+      <p class="auth-legal">义乌AI圈仅面向真实经营者 · 一个手机号对应一个身份<br>继续即表示你同意<a href="legal.html#terms" target="_blank" rel="noopener">《用户协议》</a>与<a href="legal.html#privacy" target="_blank" rel="noopener">《隐私政策》</a></p>
+
+      <div class="demo-hint">
+        <b>Demo</b> · 验证码会显示在上方提示条 · 账号数据仅保存在本机浏览器
+      </div>
+    </div>
+  </section>
+</div>
+
+<script src="assets/js/config.js" defer></script>
+<script src="assets/js/auth.js" defer></script>
+<script src="assets/js/login.js" defer></script>
+</body>
+</html>

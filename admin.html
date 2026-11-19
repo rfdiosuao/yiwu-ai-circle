@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>运营后台 · 义乌AI圈</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/png" href="assets/img/logo-icon.png?v=2">
+<link rel="stylesheet" href="assets/css/styles.css">
+<link rel="stylesheet" href="assets/css/admin.css">
+</head>
+<body>
+
+<!-- ================= AUTH GATE ================= -->
+<div class="agate" id="gate">
+  <div class="agate__card">
+    <img class="agate__logo" src="assets/img/logo.png?v=2" alt="义乌AI圈">
+    <div class="agate__kicker">运营后台</div>
+    <h1>后台登录</h1>
+    <p class="agate__sub">义乌AI圈的运营后台。用户、订阅、商家、内容，一切可配置。</p>
+
+    <form id="gateForm" novalidate>
+      <div class="dfield">
+        <label for="gateUser">管理员账号</label>
+        <input class="input" id="gateUser" name="user" value="admin" autocomplete="username" placeholder="账号">
+      </div>
+      <div class="dfield">
+        <label for="gatePass">密码</label>
+        <input class="input" id="gatePass" name="pass" type="password" autocomplete="current-password" placeholder="请输入密码">
+      </div>
+      <p class="agate__err" id="gateErr" role="alert"></p>
+      <button class="btn btn--red btn--block" type="submit" id="gateBtn">进入后台</button>
+    </form>
+
+    <div class="agate__hint">Demo · 账号 <b>admin</b> · 密码 <b>ywai2026</b></div>
+    <a class="agate__back" href="index.html">← 回到前台</a>
+  </div>
+</div>
+
+<!-- ================= APP SHELL ================= -->
+<div class="adm" id="app" hidden>
+  <aside class="side">
+    <div class="side__brand">
+      <img class="side__logo" src="assets/img/logo-light.png?v=2" alt="义乌AI圈">
+      <em class="side__tag">运营后台</em>
+    </div>
+
+    <nav class="side__nav" id="nav" aria-label="后台导航"></nav>
+
+    <div class="side__foot">
+      <span class="avatar" id="sideAvatar">管</span>
+      <span class="side__who">
+        <strong id="sideName">管理员</strong>
+        <span id="sideRole">超级管理员</span>
+      </span>
+      <button class="side__out" type="button" id="sideOut">退出</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar__crumbs"><span>义乌AI圈</span><span>/</span><b id="crumb">总览</b></div>
+      <div class="topbar__right">
+        <span class="topbar__dot">系统正常</span>
+        <span id="today">2026 · 11 · 16</span>
+      </div>
+    </header>
+    <main class="view" id="view"></main>
+  </div>
+</div>
+
+<!-- ================= DRAWER ================= -->
+<div class="drawer-veil" id="veil"></div>
+<aside class="drawer" id="drawer" aria-hidden="true" aria-label="编辑面板">
+  <div class="drawer__head">
+    <div>
+      <div class="drawer__kicker" id="drawerKicker"></div>
+      <h2 id="drawerTitle"></h2>
+      <p id="drawerSub"></p>
+    </div>
+    <button class="drawer__close" type="button" data-close-drawer aria-label="关闭">✕</button>
+  </div>
+  <div class="drawer__body" id="drawerBody"></div>
+  <div class="drawer__foot" id="drawerFoot"></div>
+</aside>
+
+<!-- ================= MODAL ================= -->
+<div class="modal amodal" id="amodal" aria-hidden="true">
+  <div class="modal__veil" data-close-modal></div>
+  <div class="modal__sheet" id="amodalSheet" role="dialog" aria-modal="true">
+    <button class="modal__close" type="button" data-close-modal aria-label="关闭">✕</button>
+    <div class="amodal__head">
+      <span class="mono" id="amodalKicker"></span>
+      <h2 id="amodalTitle"></h2>
+      <p id="amodalSub"></p>
+    </div>
+    <div id="amodalBody"></div>
+    <div class="amodal__foot" id="amodalFoot"></div>
+  </div>
+</div>
+
+<script src="assets/js/admin-data.js"></script>
+<script src="assets/js/admin.js"></script>
+</body>
+</html>

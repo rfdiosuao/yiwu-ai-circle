@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>社区 · 义乌AI圈</title>
+<meta name="description" content="义乌AI圈社区：选品情报、物流拼柜、直播复盘与一线问答。">
+<link rel="icon" type="image/png" href="assets/img/logo-icon.png?v=2">
+<link rel="stylesheet" href="assets/css/styles.css">
+<link rel="stylesheet" href="assets/css/pages.css">
+<link rel="stylesheet" href="assets/css/auth.css">
+</head>
+<body data-page="posts">
+
+<header class="masthead">
+  <div class="wrap masthead__inner">
+    <a class="brand" href="index.html" aria-label="义乌AI圈首页">
+      <img class="brand__logo" src="assets/img/logo.png?v=2" alt="义乌AI圈">
+    </a>
+    <nav class="nav" aria-label="主导航">
+      <a href="index.html" data-nav="home"><i>01</i>首页</a>
+      <a href="posts.html" data-nav="posts"><i>02</i>社区</a>
+      <a href="products.html" data-nav="products"><i>03</i>AI 工具</a>
+      <a href="merchants.html" data-nav="merchants"><i>04</i>商家</a>
+    </nav>
+    <div class="head-actions">
+      <a class="btn btn--sm btn--ink" href="login.html?redirect=posts.html" data-auth-entry>登录 / 入场</a>
+      <div class="user-menu" data-user-menu hidden>
+        <button class="user-menu__btn" type="button" data-user-toggle aria-expanded="false" aria-haspopup="menu">
+          <span class="avatar avatar--sm" data-user-avatar>义</span>
+          <span class="user-menu__name" data-user-name>圈友</span>
+        </button>
+        <div class="user-menu__panel" role="menu">
+          <div class="user-menu__head">
+            <strong data-user-name>圈友</strong>
+            <span data-user-phone>+86 138****0000</span>
+          </div>
+          <a href="profile.html" data-my-home role="menuitem">我的主页 <span class="mono">→</span></a>
+          <a href="posts.html#composer" role="menuitem">去发一条 <span class="mono">→</span></a>
+          <a href="posts.html" role="menuitem">我的帖子 <span class="mono">→</span></a>
+          <button type="button" class="is-danger" data-logout role="menuitem">退出登录</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section class="page-head">
+  <span class="page-head__bg" aria-hidden="true">集</span>
+  <div class="wrap page-head__inner">
+    <div>
+      <div class="sec-head__idx mono"><b>02</b><span>社区 · 发帖与交流</span></div>
+      <h1>社区</h1>
+      <p class="page-head__sub">选品、物流、直播、合规——把正在发生的事写下来，就有人接得上话。</p>
+    </div>
+    <div class="page-head__stats">
+      <div class="pstat"><b>12,847</b><span>位经营者</span></div>
+      <div class="pstat"><b data-stat="posts-today">9</b><span>今日新帖</span></div>
+      <div class="pstat"><b>8</b><span>条精华</span></div>
+    </div>
+  </div>
+</section>
+
+<div class="wrap board">
+
+  <!-- ============ RAIL ============ -->
+  <aside class="rail" aria-label="板块筛选">
+    <div class="rail__box">
+      <div class="rail__title"><span>板块</span><span>筛选</span></div>
+      <div class="rail__list">
+        <button class="rail__item is-on" type="button" data-filter-tag="all">全部 <span class="rail__n">1,284</span></button>
+        <button class="rail__item" type="button" data-filter-tag="选品">选品情报 <span class="rail__n">412</span></button>
+        <button class="rail__item" type="button" data-filter-tag="物流">物流拼柜 <span class="rail__n">198</span></button>
+        <button class="rail__item" type="button" data-filter-tag="直播">直播基地 <span class="rail__n">236</span></button>
+        <button class="rail__item" type="button" data-filter-tag="AI工具">AI 工具 <span class="rail__n">177</span></button>
+        <button class="rail__item" type="button" data-filter-tag="合规">出海合规 <span class="rail__n">84</span></button>
+        <button class="rail__item" type="button" data-filter-tag="求助">互助问答 <span class="rail__n">143</span></button>
+        <button class="rail__item" type="button" data-filter-tag="政策">政策速递 <span class="rail__n">34</span></button>
+      </div>
+    </div>
+
+    <div class="rail__box">
+      <div class="rail__title"><span>热门话题</span><span>筛选</span></div>
+      <div class="rail__topics">
+        <button class="topic" type="button" data-filter-tag="选品">#圣诞尾货</button>
+        <button class="topic" type="button" data-filter-tag="合规">#SASO</button>
+        <button class="topic" type="button" data-filter-tag="物流">#利雅得</button>
+        <button class="topic" type="button" data-filter-tag="直播">#数字人</button>
+        <button class="topic" type="button" data-filter-tag="AI工具">#Listing</button>
+        <button class="topic" type="button" data-filter-tag="求助">#RTL排版</button>
+      </div>
+    </div>
+
+    <div class="rail__box">
+      <div class="rail__title"><span>发帖</span><span>写一条</span></div>
+      <a class="btn btn--red btn--block" href="#composer">写一条 <span class="arrow">↑</span></a>
+      <p class="rail__note" style="margin-top:12px">
+        <strong>社区三条规矩</strong>
+        讲事实、给出处；不刷屏、不硬广；有资源的先给，再谈合作。
+      </p>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main>
+    <div class="composer" data-composer id="composer">
+      <div class="composer__locked" data-composer-locked>
+        <div>
+          <strong style="font-size:15px">登录后发帖</strong>
+          <p class="sec-sub" style="margin-top:4px;font-size:12.5px">手机号 + 验证码，10 秒入场。发帖、评论、收藏一次打通。</p>
+        </div>
+        <button class="btn btn--red btn--sm" type="button" data-composer-login>手机号登录 <span class="arrow">→</span></button>
+      </div>
+
+      <form data-composer-form hidden novalidate>
+        <div class="composer__top">
+          <span class="avatar avatar--red" data-composer-avatar>义</span>
+          <div class="composer__field">
+            <textarea data-composer-text maxlength="400" placeholder="说说你在义乌的发现、需求或手里的资源……（第一行会自动成为标题）"></textarea>
+          </div>
+        </div>
+        <div class="composer__bar">
+          <div class="composer__tools">
+            <select class="composer__select" data-composer-topic aria-label="选择板块">
+              <option value="选品"># 选品</option>
+              <option value="物流"># 物流</option>
+              <option value="直播"># 直播</option>
+              <option value="AI工具"># AI 工具</option>
+              <option value="合规"># 合规</option>
+              <option value="求助"># 求助</option>
+            </select>
+            <span class="composer__count" data-composer-count>0 / 400</span>
+          </div>
+          <button class="btn btn--red btn--sm" type="submit" data-composer-submit>发布 <span class="arrow">↑</span></button>
+        </div>
+      </form>
+    </div>
+
+    <div class="feed-head">
+      <div class="feed-head__l">
+        <h2>全部动态</h2>
+        <span class="mono">共 <b data-feed-count>8</b> 条</span>
+      </div>
+      <div class="sortbtn">
+        <button type="button" class="is-on" data-sort="new">最新</button>
+        <button type="button" data-sort="hot">热度</button>
+      </div>
+    </div>
+
+    <div data-feed>
+
+      <article class="post is-hot" data-post="p0" data-tag="选品">
+        <div class="post__head">
+          <span class="avatar avatar--red">岚</span>
+          <div class="post__who">
+            <strong>义乌阿岚</strong>
+            <span>中东选品 · 12 分钟前 · 义乌北苑</span>
+          </div>
+        </div>
+        <h3 class="post__title">沙特客户要的包装，和欧美完全是两套逻辑</h3>
+        <p class="post__body">同一款毛绒挂件，欧美要透明窗口、字越大越好；沙特客户要求外箱不能出现动物图案，阿语标签必须放在正面右上。改包装花了三周，但复购率翻了一倍。两个市场的包装要求我整理成了对照表，需要的说一声。</p>
+        <div class="post__foot">
+          <button class="act" type="button" data-act="like" data-base="87">♡ 赞 <span data-n>87</span></button>
+          <button class="act" type="button" data-act="comment" data-base="12">◌ 评论 <span data-n>12</span></button>
+          <button class="act" type="button" data-act="mark" data-base="26">◇ 收藏 <span data-n>26</span></button>
+          <span class="tag" style="margin-left:auto">#选品</span>
+        </div>
+        <div class="post__comments">
+          <div class="cmt-form">
+            <input type="text" placeholder="写下你的回应…" maxlength="120" aria-label="评论内容">
+            <button class="btn btn--sm btn--ghost" type="button" data-cmt-send>发送</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="post is-hot" data-post="p1" data-tag="选品">
+        <div class="post__head">
+          <span class="avatar avatar--red">阿</span>
+          <div class="post__who">
+            <strong>阿灿 <span class="verified">认证商家</span></strong>
+            <span>跨境内容 · 6 分钟前 · 义乌北苑</span>
+          </div>
+        </div>
+        <h3 class="post__title">用 AI 把 1688 详情页改成 TikTok 脚本，一条视频卖了 400 单</h3>
+        <p class="post__body">别直接翻译卖点。我把详情页拆成「痛点—演示—价格锚点」三段，再让模型按美区口播节奏重写，完播率从 18% 拉到 41%。关键在第二步：让 AI 只保留能被镜头拍出来的信息，剩下的全删。完整提示词我贴在评论区，自取。</p>
+        <div class="post__foot">
+          <button class="act" type="button" data-act="like" data-base="128">♡ 赞 <span data-n>128</span></button>
+          <button class="act" type="button" data-act="comment" data-base="23">◌ 评论 <span data-n>23</span></button>
+          <button class="act" type="button" data-act="mark" data-base="41">◇ 收藏 <span data-n>41</span></button>
+          <span class="tag" style="margin-left:auto">#选品</span>
+        </div>
+        <div class="post__comments">
+          <div class="cmt"><b>小满<span>12 分钟前</span></b><p>第二步这个思路太对了，我之前让 AI 全量改写，出来的词根本拍不出来。</p></div>
+          <div class="cmt-form">
+            <input type="text" placeholder="写下你的回应…" maxlength="120" aria-label="评论内容">
+            <button class="btn btn--sm btn--ghost" type="button" data-cmt-send>发送</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="post" data-post="p2" data-tag="合规">
+        <div class="post__head">
+          <span class="avatar avatar--teal">哈</span>
+          <div class="post__who">
+            <strong>哈桑在中国</strong>
+            <span>中东采购 · 21 分钟前 · 商贸城二区</span>
+          </div>
+        </div>
+        <h3 class="post__title">Arabic 标签不是翻译就行：沙特 SASO 这几个字段最容易漏</h3>
+        <p class="post__body">最近帮三家义乌工厂改标签，全卡在净重与成分的阿拉伯语写法上。除了常规的产品名和产地，SASO 还要求标注生产商完整地址、批次号与阿拉伯语警示语。我把常见品类的字段清单整理成表格了，需要的说一声。</p>
+        <div class="post__foot">
+          <button class="act" type="button" data-act="like" data-base="96">♡ 赞 <span data-n>96</span></button>
+          <button class="act" type="button" data-act="comment" data-base="18">◌ 评论 <span data-n>18</span></button>
+          <button class="act" type="button" data-act="mark" data-base="52">◇ 收藏 <span data-n>52</span></button>
+          <span class="tag" style="margin-left:auto">#合规</span>
+        </div>
+        <div class="post__comments">
+          <div class="cmt-form">
+            <input type="text" placeholder="写下你的回应…" maxlength="120" aria-label="评论内容">
+            <button class="btn btn--sm btn--ghost" type="button" data-cmt-send>发送</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="post" data-post="p3" data-tag="物流">
+        <div class="post__head">
+          <span class="avatar avatar--gold">莫</span>
+          <div class="post__who">
+            <strong>老莫货代 <span class="verified">认证商家</span></strong>
+            <span>中东专线 · 38 分钟前 · 福田物流园</span>
+          </div>
+        </div>
+        <h3 class="post__title">义乌到利雅得新舱位，含税 18.6/kg，周三截单，有人拼柜吗</h3>
+        <p class="post__body">直飞航线补贴下来之后价格确实松动了，这批还剩三个方。双清包税，走普货，带电要提前说。周三晚上截单，周五出仓。有货的下面留言品类和方数，我私信报详细报价。</p>
+        <div class="post__foot">
+          <button class="act" type="button" data-act="like" data-base="64">♡ 赞 <span data-n>64</span></button>
+          <button class="act" type="button" data-act="comment" data-base="31">◌ 评论 <span data-n>31</span></button>
+          <button class="act" type="button" data-act="mark" data-base="12">◇ 收藏 <span data-n>12</span></button>
+          <span class="tag" style="margin-left:auto">#物流</span>
+        </div>
+        <div class="post__comments">
+          <div class="cmt-form">
+            <input type="text" placeholder="写下你的回应…" maxlength="120" aria-label="评论内容">
+            <button class="btn btn--sm btn--ghost" type="button" data-cmt-send>发送</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="post" data-post="p4" data-tag="直播">
+        <div class="post__head">
+          <span class="avatar avatar--gold">朱</span>
+          <div class="post__who">
+            <strong>朱哥尾货 <span class="verified">认证商家</span></strong>
+            <span>北下朱 B-12 · 40 分钟前</span>
+          </div>
+        </div>
+        <h3 class="post__title">青口今晚 8 点空出一间直播间，4 小时免费给圈里新手</h3>
+        <p class="post__body">设备齐全，补光灯、声卡、绿幕都有，能带自己的货。只要一件代发，我这边仓里现成的都能播。先到先用，评论区报到就行。新手别怕冷场，我让运营在旁边帮你盯数据。</p>
+        <div class="post__foot">
+          <button class="act" type="button" data-act="like" data-base="211">♡ 赞 <span data-n>211</span></button>
+          <button class="act" type="button" data-act="comment" data-base="57">◌ 评论 <span data-n>57</span></button>
+          <button class="act" type="button" data-act="mark" data-base="88">◇ 收藏 <span data-n>88</span></button>
+          <span class="tag" style="margin-left:auto">#直播</span>
+        </div>
+        <div class="post__comments">
+          <div class="cmt"><b>阿哲<span>半小时前</span></b><p>报个到，做饰品，能带自己的货吗？</p></div>
+          <div class="cmt-form">
+            <input type="text" placeholder="写下你的回应…" maxlength="120" aria-label="评论内容">
+            <button class="btn btn--sm btn--ghost" type="button" data-cmt-send>发送</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="post" data-post="p5" data-tag="AI工具">
+        <div class="post__head">
+          <span class="avatar avatar--teal">满</span>
+          <div class="post__who">
+            <strong>小满</strong>
+            <span>数字人直播 · 1 小时前 · 青口</span>
+          </div>
+        </div>
+        <h3 class="post__title">数字人直播 30 天复盘：GMV 4.2 万，退货率 11%，坑都在这</h3>
+        <p class="post__body">先说结论：数字人适合做夜班和长尾时段，不适合做主推爆品。我们跑的是家居小件，客单 39，凌晨 1 点到 7 点贡献了 62% 的成交。三个坑：口型对不上会掉停留、话术循环太明显会被限流、售后话术必须提前写死。详细数据我整理成表了。</p>
+        <div class="post__foot">
+          <button class="act" type="button" data-act="like" data-base="173">♡ 赞 <span data-n>173</span></button>
+          <button class="act" type="button" data-act="comment" data-base="44">◌ 评论 <span data-n>44</span></button>
+          <button class="act" type="button" data-act="mark" data-base="96">◇ 收藏 <span data-n>96</span></button>
+          <span class="tag" style="margin-left:auto">#AI工具</span>
+        </div>
+        <div class="post__comments">
+          <div class="cmt-form">
+            <input type="text" placeholder="写下你的回应…" maxlength="120" aria-label="评论内容">
+            <button class="btn btn--sm btn--ghost" type="button" data-cmt-send>发送</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="post" data-post="p6" data-tag="求助">
+        <div class="post__head">
+          <span class="avatar">哲</span>
+          <div class="post__who">
+            <strong>阿哲</strong>
+            <span>饰品独立站 · 2 小时前</span>
+          </div>
+        </div>
+        <h3 class="post__title">有没有人做中东独立站？想找一个懂 RTL 排版的前端</h3>
+        <p class="post__body">做饰品的，想上沙特和阿联酋两个站点，需求不复杂：阿拉伯语 RTL、货到付款、WhatsApp 客服。预算不高但可以长期合作。有推荐的直接甩联系方式，或者拉个群聊也行。</p>
+        <div class="post__foot">
+          <button class="act" type="button" data-act="like" data-base="27">♡ 赞 <span data-n>27</span></button>
+          <button class="act" type="button" data-act="comment" data-base="19">◌ 评论 <span data-n>19</span></button>
+          <button class="act" type="button" data-act="mark" data-base="8">◇ 收藏 <span data-n>8</span></button>
+          <span class="tag" style="margin-left:auto">#求助</span>
+        </div>
+        <div class="post__comments">
+          <div class="cmt-form">
+            <input type="text" placeholder="写下你的回应…" maxlength="120" aria-label="评论内容">
+            <button class="btn btn--sm btn--ghost" type="button" data-cmt-send>发送</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="post" data-post="p7" data-tag="选品">
+        <div class="post__head">
+          <span class="avatar avatar--red">陈</span>
+          <div class="post__who">
+            <strong>义乌小陈</strong>
+            <span>选品 · 3 小时前 · 商贸城二区</span>
+          </div>
+        </div>
+        <h3 class="post__title">商贸城二区新到一批圣诞尾货，看图，适合做 TikTok 圣诞季</h3>
+        <p class="post__body">一批毛绒挂件和装饰灯串，工厂尾单，数量不多。挂件 1.8 一个，灯串 4.2 一套，500 起拿，混批可以谈。做内容的可以拿去拍，我这边不限制素材。真正的尾货价，别拿去和现货比。</p>
+        <div class="post__foot">
+          <button class="act" type="button" data-act="like" data-base="58">♡ 赞 <span data-n>58</span></button>
+          <button class="act" type="button" data-act="comment" data-base="16">◌ 评论 <span data-n>16</span></button>
+          <button class="act" type="button" data-act="mark" data-base="22">◇ 收藏 <span data-n>22</span></button>
+          <span class="tag" style="margin-left:auto">#选品</span>
+        </div>
+        <div class="post__comments">
+          <div class="cmt-form">
+            <input type="text" placeholder="写下你的回应…" maxlength="120" aria-label="评论内容">
+            <button class="btn btn--sm btn--ghost" type="button" data-cmt-send>发送</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="post" data-post="p8" data-tag="政策">
+        <div class="post__head">
+          <span class="avatar">助</span>
+          <div class="post__who">
+            <strong>圈助手 <span class="verified">官方</span></strong>
+            <span>政策速递 · 4 小时前</span>
+          </div>
+        </div>
+        <h3 class="post__title">义乌海关：小型商品出口查验率下调至 8%，6 月 1 日起生效</h3>
+        <p class="post__body">单件低于 5kg 的小型商品，出口查验率从 12% 下调到 8%；跨境电商 B2C 包裹可走「集中申报、清单核放」。对做小件铺货的圈友是实打实的时效利好，报关行那边已经开始按新口径接单了。</p>
+        <div class="post__foot">
+          <button class="act" type="button" data-act="like" data-base="256">♡ 赞 <span data-n>256</span></button>
+          <button class="act" type="button" data-act="comment" data-base="41">◌ 评论 <span data-n>41</span></button>
+          <button class="act" type="button" data-act="mark" data-base="130">◇ 收藏 <span data-n>130</span></button>
+          <span class="tag" style="margin-left:auto">#政策</span>
+        </div>
+        <div class="post__comments">
+          <div class="cmt-form">
+            <input type="text" placeholder="写下你的回应…" maxlength="120" aria-label="评论内容">
+            <button class="btn btn--sm btn--ghost" type="button" data-cmt-send>发送</button>
+          </div>
+        </div>
+      </article>
+
+      <div class="empty goods-empty" data-feed-empty hidden>
+        <strong>这个板块还没有帖子</strong>
+        换个板块看看，或者你来开第一帖。
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="foot__top">
+      <div class="foot__brand">
+        <a class="brand" href="index.html" aria-label="义乌AI圈首页">
+          <img class="brand__logo brand__logo--light" src="assets/img/logo-light.png?v=2" alt="义乌AI圈">
+        </a>
+        <p class="foot__slogan">一鼓通天下，智联新义乌。</p>
+        <p class="foot__tagline">让每个档口都有一支 AI 团队。供应链直联、工具共建、订单撮合。</p>
+        <a class="btn btn--red btn--sm brand__cta" href="login.html">手机号入场 <span class="arrow">→</span></a>
+      </div>
+      <div class="foot__col">
+        <h4>逛圈子</h4>
+        <ul>
+          <li><a href="posts.html">社区 · 发帖</a></li>
+          <li><a href="products.html">AI 工具 · 订阅</a></li>
+          <li><a href="merchants.html">商家 · 名录</a></li>
+        </ul>
+      </div>
+      <div class="foot__col">
+        <h4>账号与服务</h4>
+        <ul>
+          <li><a href="login.html">登录 / 注册</a></li>
+          <li><a href="certify.html">申请入驻商家</a></li>
+          <li><a href="legal.html#rules">社区公约</a></li>
+          <li><a href="admin.html">运营后台（演示）</a></li>
+        </ul>
+      </div>
+      <div class="foot__col">
+        <h4>线下据点</h4>
+        <ul>
+          <li><a href="merchants.html">青口直播基地</a></li>
+          <li><a href="merchants.html">北下朱选品站</a></li>
+          <li><a href="merchants.html">商贸城服务站</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot__mark" aria-hidden="true">YIWU AI CIRCLE</div>
+    <div class="foot__bar">
+      <span>© 2026 义乌AI圈 · DEMO BUILD 0.1</span>
+      <span class="foot__legal">
+        <a href="legal.html#guide">使用手册</a>
+        <a href="legal.html#terms">用户协议</a>
+        <a href="legal.html#privacy">隐私政策</a>
+        <a href="legal.html#rules">社区公约</a>
+      </span>
+      <span>页面数据均为演示内容 · 不构成交易建议</span>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/config.js" defer></script>
+<script src="assets/js/auth.js" defer></script>
+<script src="assets/js/site.js" defer></script>
+</body>
+</html>

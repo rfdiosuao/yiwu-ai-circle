@@ -1,0 +1,19 @@
+# 密钥与本地环境
+secrets.json
+.env
+.env.*
+
+# 依赖与构建产物
+node_modules/
+dist/
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.screenshots/
+.trae-html-share-packages/
+
+# 日志
+*.log

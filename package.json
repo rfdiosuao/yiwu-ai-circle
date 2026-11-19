@@ -1,0 +1,13 @@
+{
+  "name": "yiwu-ai-circle",
+  "version": "0.2.0",
+  "private": true,
+  "description": "义乌AI圈：静态站点 + 商家认证支付接口",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

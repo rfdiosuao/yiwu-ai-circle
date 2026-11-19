@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>个人主页 · 义乌AI圈</title>
+<meta name="description" content="义乌AI圈个人主页：写下你在义乌做的事，放上电话、微信与照片，让别人一眼找到你。">
+<link rel="icon" type="image/png" href="assets/img/logo-icon.png?v=2">
+<link rel="stylesheet" href="assets/css/styles.css">
+<link rel="stylesheet" href="assets/css/pages.css">
+<link rel="stylesheet" href="assets/css/auth.css">
+<link rel="stylesheet" href="assets/css/profile.css">
+</head>
+<body data-page="profile">
+
+<header class="masthead">
+  <div class="wrap masthead__inner">
+    <a class="brand" href="index.html" aria-label="义乌AI圈首页">
+      <img class="brand__logo" src="assets/img/logo.png?v=2" alt="义乌AI圈">
+    </a>
+    <nav class="nav" aria-label="主导航">
+      <a href="index.html" data-nav="home"><i>01</i>首页</a>
+      <a href="posts.html" data-nav="posts"><i>02</i>社区</a>
+      <a href="products.html" data-nav="products"><i>03</i>AI 工具</a>
+      <a href="merchants.html" data-nav="merchants"><i>04</i>商家</a>
+    </nav>
+    <div class="head-actions">
+      <a class="btn btn--sm btn--ink" href="login.html?redirect=profile.html" data-auth-entry>登录 / 入场</a>
+      <div class="user-menu" data-user-menu hidden>
+        <button class="user-menu__btn" type="button" data-user-toggle aria-expanded="false" aria-haspopup="menu">
+          <span class="avatar avatar--sm" data-user-avatar>义</span>
+          <span class="user-menu__name" data-user-name>圈友</span>
+        </button>
+        <div class="user-menu__panel" role="menu">
+          <div class="user-menu__head">
+            <strong data-user-name>圈友</strong>
+            <span data-user-phone>+86 138****0000</span>
+          </div>
+          <a href="profile.html" data-my-home role="menuitem">我的主页 <span class="mono">→</span></a>
+          <a href="posts.html#composer" role="menuitem">去发一条 <span class="mono">→</span></a>
+          <button type="button" class="is-danger" data-logout role="menuitem">退出登录</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ================= PROFILE ================= -->
+<main id="profileMain" hidden>
+
+  <section class="pcover" id="cover" data-theme="paper">
+    <span class="pcover__mark" id="coverMark">义</span>
+    <div class="wrap pcover__inner">
+      <div class="pcover__meta">
+        <span>YIWU · 30.87°N / 120.07°E</span>
+        <span id="coverSince">MEMBER SINCE 2026 / 07</span>
+      </div>
+      <span class="pcover__seal">已<br>入场</span>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <section class="pcard">
+      <div class="pcard__avatar" id="pAvatar" data-tone="1">义</div>
+      <div class="pcard__main">
+        <h1 class="pcard__name">
+          <span id="pName">圈友</span>
+          <span class="tag tag--teal" id="pRole">圈友</span>
+        </h1>
+        <p class="pcard__tag" id="pTag"></p>
+        <div class="pcard__tags" id="pTags"></div>
+      </div>
+      <div class="pcard__acts">
+        <button class="btn btn--sm btn--red" id="pEdit" type="button" hidden>装扮主页 <span class="arrow">✎</span></button>
+        <button class="btn btn--sm btn--ghost" id="pShare" type="button">复制主页链接</button>
+      </div>
+    </section>
+
+    <div class="pstats" id="pStats"></div>
+
+    <div class="pbody">
+      <div class="pmain">
+
+        <section class="pblock" id="pBioBlock" hidden>
+          <div class="pblock__head"><h2>关于我</h2><span class="mono">简介</span></div>
+          <p class="pbio" id="pBio"></p>
+        </section>
+
+        <section class="pblock">
+          <div class="pblock__head"><h2>我在做的事</h2><span class="mono">在做的事</span></div>
+          <div class="doing" id="pDoing"></div>
+        </section>
+
+        <section class="pblock">
+          <div class="pblock__head"><h2>相册</h2><span class="mono" id="pCount"></span></div>
+          <div class="gallery" id="pGallery"></div>
+        </section>
+
+        <section class="pblock">
+          <div class="pblock__head"><h2>最近发帖</h2><a class="link-arrow" href="posts.html">去社区 <span>→</span></a></div>
+          <div class="pposts" id="pPosts"></div>
+        </section>
+
+      </div>
+
+      <aside class="pside">
+        <div id="pContact"></div>
+        <div id="pAbout"></div>
+        <div id="pSideTags"></div>
+      </aside>
+    </div>
+  </div>
+</main>
+
+<!-- ================= EMPTY / NOT FOUND ================= -->
+<section class="pnf" id="notFound" hidden>
+  <div class="wrap">
+    <div class="sec-head__idx mono" style="justify-content:center"><b>主页</b><span>个人主页</span></div>
+    <h1 id="nfTitle">先登录，再装扮</h1>
+    <p id="nfDesc">每个手机号对应一个主页。</p>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:24px">
+      <a class="btn btn--red" href="login.html?redirect=profile.html">登录 / 入场 <span class="arrow">→</span></a>
+      <a class="btn btn--ghost" href="posts.html">先去社区看看</a>
+    </div>
+  </div>
+</section>
+
+<!-- ================= EDITOR ================= -->
+<div class="pedit-veil" id="editVeil"></div>
+<aside class="pedit" id="editPanel" aria-hidden="true" aria-label="装扮主页">
+  <div class="pedit__head">
+    <div>
+      <span class="mono">装扮主页</span>
+      <h2>装扮你的主页</h2>
+      <p>改完点保存，立刻生效。</p>
+    </div>
+    <button class="pedit__close" id="editClose" type="button" aria-label="关闭">✕</button>
+  </div>
+
+  <div class="pedit__body">
+    <form class="pform" id="editForm" novalidate>
+
+      <div class="psection">封面</div>
+      <div class="themes">
+        <button class="theme-sw" data-t="paper" type="button">纸</button>
+        <button class="theme-sw" data-t="ink" type="button">墨</button>
+        <button class="theme-sw" data-t="red" type="button">朱</button>
+        <button class="theme-sw" data-t="teal" type="button">青</button>
+      </div>
+      <p class="dhint">当前封面：<b id="themeName">纸</b>。大字会用你昵称的第一个字。</p>
+
+      <div class="psection">头像</div>
+      <div class="avatar-edit">
+        <div class="avatar-prev" id="avatarPrev" data-tone="1">义</div>
+        <div class="avatar-side">
+          <button class="btn btn--ghost btn--sm" type="button" data-pick-avatar>上传头像</button>
+          <button class="btn btn--ghost btn--sm" type="button" data-clear-avatar>用文字头像</button>
+          <div class="tone-row">
+            <button class="tone-dot" data-tone="1" type="button" aria-label="墨色"></button>
+            <button class="tone-dot" data-tone="2" type="button" aria-label="朱红"></button>
+            <button class="tone-dot" data-tone="3" type="button" aria-label="青色"></button>
+            <button class="tone-dot" data-tone="4" type="button" aria-label="金色"></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="psection">基本信息</div>
+      <div class="pgrid">
+        <div class="pfield">
+          <label for="fNick">昵称 <i>2-14 字</i></label>
+          <input id="fNick" type="text" maxlength="14" placeholder="圈子里怎么称呼你">
+          <span class="perr" data-err="fNick"></span>
+        </div>
+        <div class="pfield">
+          <label for="fRole">身份 <i>20 字内</i></label>
+          <input id="fRole" type="text" maxlength="20" placeholder="如 跨境选品 / 中东市场">
+        </div>
+        <div class="pfield full">
+          <label for="fTag">一句话签名 <i>40 字内</i></label>
+          <input id="fTag" type="text" maxlength="40" placeholder="你希望别人记住你哪一句">
+          <span class="perr" data-err="fTag"></span>
+        </div>
+        <div class="pfield">
+          <label for="fCity">坐标</label>
+          <input id="fCity" type="text" maxlength="20" placeholder="如 义乌 · 北苑">
+        </div>
+        <div class="pfield">
+          <label for="fTags">标签 <i>用、分隔</i></label>
+          <input id="fTags" type="text" placeholder="中东专线、家居小件">
+        </div>
+      </div>
+
+      <div class="psection">联系方式</div>
+      <div class="pgrid">
+        <div class="pfield">
+          <label for="fPhone">手机号</label>
+          <input id="fPhone" type="tel" inputmode="numeric" maxlength="11" placeholder="11 位手机号">
+          <span class="perr" data-err="fPhone"></span>
+        </div>
+        <div class="pfield">
+          <label for="fWechat">微信号</label>
+          <input id="fWechat" type="text" maxlength="30" placeholder="方便别人加你">
+          <span class="perr" data-err="fWechat"></span>
+        </div>
+      </div>
+
+      <div class="psection">关于我</div>
+      <div class="pfield">
+        <label for="fBio">简介 <i>200 字内</i></label>
+        <textarea id="fBio" maxlength="200" placeholder="你在义乌做什么、擅长什么、想认识谁"></textarea>
+        <span class="perr" data-err="fBio"></span>
+      </div>
+
+      <div class="psection">我在做的事</div>
+      <div class="do-row">
+        <div class="row-top"><span>01</span></div>
+        <input id="d1t" type="text" maxlength="24" placeholder="标题，如 中东家居小件选品">
+        <textarea id="d1d" maxlength="90" placeholder="一两句话说清楚"></textarea>
+      </div>
+      <div class="do-row">
+        <div class="row-top"><span>02</span></div>
+        <input id="d2t" type="text" maxlength="24" placeholder="第二件事（可留空）">
+        <textarea id="d2d" maxlength="90" placeholder="一两句话说清楚"></textarea>
+      </div>
+      <div class="do-row">
+        <div class="row-top"><span>03</span></div>
+        <input id="d3t" type="text" maxlength="24" placeholder="第三件事（可留空）">
+        <textarea id="d3d" maxlength="90" placeholder="一两句话说清楚"></textarea>
+      </div>
+
+      <div class="psection">相册</div>
+      <div class="upgrid" id="upGrid"></div>
+      <p class="dhint">最多 6 张，自动压缩后存在本机。建议拍档口、样品、打包现场。</p>
+
+      <input type="file" id="fileAvatar" accept="image/*" hidden>
+      <input type="file" id="fileGallery" accept="image/*" multiple hidden>
+    </form>
+  </div>
+
+  <div class="pedit__foot">
+    <span class="mono" style="color:var(--ink-40)">自动存到本机</span>
+    <span style="flex:1"></span>
+    <button class="btn btn--sm btn--ghost" id="editCancel" type="button">取消</button>
+    <button class="btn btn--sm btn--red" id="editSave" type="button">保存</button>
+  </div>
+</aside>
+
+<div class="lightbox" id="lightbox">
+  <button class="lightbox__close" type="button" aria-label="关闭">✕</button>
+  <img id="lightImg" alt="相册大图">
+</div>
+
+<script src="assets/js/config.js" defer></script>
+<script src="assets/js/auth.js" defer></script>
+<script src="assets/js/profile.js" defer></script>
+</body>
+</html>
