@@ -5,39 +5,47 @@
    ========================================================================== */
 
 /* ---------- tokens ---------- */
+/* 设计方向：SaaS 社区的干净与易读 × 义乌账本的朱印与铺位号。
+   暖白底、白卡片、柔和阴影、圆角；朱红只用在关键动作与印章上。 */
 :root {
-  --paper: #f2ecdd;
-  --paper-2: #e9e1ce;
-  --paper-3: #ded4bc;
-  --card: #fbf7ec;
-  --ink: #14120a;
-  --ink-90: rgba(20, 18, 10, 0.9);
-  --ink-70: rgba(20, 18, 10, 0.7);
-  --ink-55: rgba(20, 18, 10, 0.55);
-  --ink-40: rgba(20, 18, 10, 0.4);
-  --ink-20: rgba(20, 18, 10, 0.2);
-  --ink-12: rgba(20, 18, 10, 0.12);
-  --ink-06: rgba(20, 18, 10, 0.06);
-  --red: #c4351c;
-  --red-deep: #9b2713;
-  --red-soft: rgba(196, 53, 28, 0.09);
-  --teal: #14504a;
+  --paper: #f6f3ec;
+  --paper-2: #efe9dd;
+  --paper-3: #e4dccb;
+  --card: #ffffff;
+  --ink: #17150f;
+  --ink-90: rgba(23, 21, 15, 0.9);
+  --ink-70: rgba(23, 21, 15, 0.72);
+  --ink-55: rgba(23, 21, 15, 0.58);
+  --ink-40: rgba(23, 21, 15, 0.44);
+  --ink-20: rgba(23, 21, 15, 0.16);
+  --ink-12: rgba(23, 21, 15, 0.1);
+  --ink-06: rgba(23, 21, 15, 0.05);
+  --line: rgba(23, 21, 15, 0.08);
+  --line-strong: rgba(23, 21, 15, 0.12);
+  --red: #c8381e;
+  --red-deep: #a02a14;
+  --red-soft: rgba(200, 56, 30, 0.08);
+  --red-tint: #fbefe9;
+  --teal: #14625a;
   --gold: #a8802c;
-  --ok: #1f6b3a;
+  --ok: #1f7a43;
 
   --f-sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Source Han Sans SC",
-    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    "Noto Sans SC", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --f-serif: "Songti SC", "Source Han Serif SC", "Noto Serif SC", "STSong", "Bodoni MT",
     Georgia, "Times New Roman", serif;
   --f-kai: "Kaiti SC", "STKaiti", "KaiTi", "楷体", var(--f-serif);
-  --f-mono: "Consolas", "SF Mono", "IBM Plex Mono", ui-monospace, "Courier New", monospace;
+  --f-mono: "SF Mono", "JetBrains Mono", "IBM Plex Mono", "Consolas", ui-monospace, monospace;
 
-  --wrap: 1280px;
+  --wrap: 1240px;
   --gut: 24px;
-  --hdr: 72px;
-  --r: 2px;
-  --shadow-hard: 6px 6px 0 var(--ink);
-  --shadow-soft: 0 18px 44px -24px rgba(20, 18, 10, 0.45);
+  --hdr: 68px;
+  --r: 16px;
+  --r-sm: 8px;
+  --r-btn: 10px;
+  --shadow-soft: 0 1px 2px rgba(23, 21, 15, 0.04), 0 8px 24px -12px rgba(23, 21, 15, 0.14);
+  --shadow-lift: 0 2px 6px rgba(23, 21, 15, 0.05), 0 24px 48px -20px rgba(23, 21, 15, 0.26);
+  --shadow-hard: var(--shadow-lift);
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.42'/%3E%3C/svg%3E");
@@ -77,7 +85,7 @@ body::before {
   z-index: 9999;
   pointer-events: none;
   background-image: var(--grain);
-  opacity: 0.16;
+  opacity: 0.05;
   mix-blend-mode: multiply;
 }
 
@@ -127,7 +135,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   display: flex;
   align-items: center;
   overflow: hidden;
-  border-bottom: 1px solid var(--ink);
+  border-bottom: 1px solid var(--line-strong);
 }
 
 .ticker__track {
@@ -172,7 +180,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   z-index: 60;
   background: rgba(242, 236, 221, 0.92);
   backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--ink);
+  border-bottom: 1px solid var(--line-strong);
 }
 
 .masthead__inner {
@@ -209,7 +217,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   font-size: 23px;
   font-weight: 700;
   line-height: 1;
-  border-radius: 1px;
+  border-radius: var(--r-sm);
   position: relative;
   transition: transform 0.35s var(--ease);
 }
@@ -236,7 +244,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .brand__text em {
   font-family: var(--f-mono);
   font-style: normal;
-  font-size: 8.5px;
+  font-size: 11px;
   letter-spacing: 0.24em;
   color: var(--ink-55);
   line-height: 1;
@@ -269,7 +277,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .nav a i {
   font-family: var(--f-mono);
   font-style: normal;
-  font-size: 9px;
+  font-size: 11px;
   color: var(--ink-40);
   transition: color 0.2s;
 }
@@ -323,18 +331,18 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
     background 0.18s, color 0.18s, border-color 0.18s;
 }
 
-.btn:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--ink); }
+.btn:hover { transform: translate(-1px, -1px); box-shadow: var(--shadow-soft); }
 .btn:active { transform: translate(0, 0); box-shadow: none; }
 
 .btn--red { --btn-bg: var(--red); --btn-bd: var(--red); --btn-fg: var(--paper); }
-.btn--red:hover { box-shadow: 3px 3px 0 var(--red-deep); }
+.btn--red:hover { box-shadow: var(--shadow-soft); }
 
 .btn--ghost {
   --btn-bg: transparent;
   --btn-fg: var(--ink);
   --btn-bd: var(--ink);
 }
-.btn--ghost:hover { box-shadow: 3px 3px 0 var(--ink); }
+.btn--ghost:hover { box-shadow: var(--shadow-soft); }
 
 .btn--paper {
   --btn-bg: var(--card);
@@ -369,13 +377,13 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   letter-spacing: 0.14em;
   text-transform: uppercase;
   padding-bottom: 3px;
-  border-bottom: 1px solid var(--ink);
+  border-bottom: 1px solid var(--line-strong);
   transition: gap 0.25s var(--ease), color 0.2s;
 }
 .link-arrow:hover { gap: 13px; color: var(--red); border-color: var(--red); }
 
 /* ---------- section header ---------- */
-.sec { padding: 84px 0; border-top: 1px solid var(--ink); position: relative; }
+.sec { padding: 84px 0; border-top: 1px solid var(--line-strong); position: relative; }
 .sec--tight { padding: 56px 0; }
 .sec--flush { border-top: 0; }
 
@@ -436,7 +444,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 
 .sec-foot-note {
   font-family: var(--f-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.12em;
   color: var(--ink-40);
   text-transform: uppercase;
@@ -450,9 +458,9 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   height: 22px;
   padding: 0 8px;
   border: 1px solid var(--ink-20);
-  border-radius: 1px;
+  border-radius: var(--r-sm);
   font-family: var(--f-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.08em;
   color: var(--ink-70);
   background: transparent;
@@ -473,7 +481,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   border-radius: 50%;
   color: var(--red);
   font-family: var(--f-mono);
-  font-size: 8px;
+  font-size: 11px;
   letter-spacing: 0.1em;
   line-height: 1.35;
   text-align: center;
@@ -509,14 +517,14 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 
 .chip__n {
   font-family: var(--f-mono);
-  font-size: 9.5px;
+  font-size: 11px;
   opacity: 0.55;
 }
 
 /* ---------- cards ---------- */
 .card {
   background: var(--card);
-  border: 1px solid var(--ink);
+  border: 1px solid var(--line-strong);
   border-radius: var(--r);
   position: relative;
 }
@@ -534,7 +542,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 
 .label {
   font-family: var(--f-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink-55);
@@ -619,7 +627,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   width: 16px; height: 16px;
   margin-top: 2px;
   border: 1px solid var(--ink-40);
-  border-radius: 1px;
+  border-radius: var(--r-sm);
   background: var(--card);
   display: grid;
   place-items: center;
@@ -654,7 +662,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   font-family: var(--f-serif);
   font-size: 17px;
   line-height: 1;
-  border: 1px solid var(--ink);
+  border: 1px solid var(--line-strong);
   overflow: hidden;
   user-select: none;
 }
@@ -696,8 +704,8 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   top: calc(100% + 10px);
   width: 232px;
   background: var(--card);
-  border: 1px solid var(--ink);
-  box-shadow: 5px 5px 0 rgba(20, 18, 10, 0.9);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-soft);
   padding: 6px;
   display: none;
   z-index: 80;
@@ -719,7 +727,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .user-menu__head strong { display: block; font-size: 14px; }
 .user-menu__head span {
   font-family: var(--f-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.1em;
   color: var(--ink-55);
 }
@@ -769,8 +777,8 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   max-height: calc(100vh - 40px);
   overflow-y: auto;
   background: var(--paper);
-  border: 1px solid var(--ink);
-  box-shadow: 10px 10px 0 rgba(14, 12, 6, 0.55);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-soft);
   padding: 30px;
   animation: sheetIn 0.28s var(--ease);
 }
@@ -817,14 +825,14 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .toast {
   background: var(--ink);
   color: var(--paper);
-  border: 1px solid var(--ink);
+  border: 1px solid var(--line-strong);
   padding: 10px 18px;
   font-size: 13px;
   line-height: 1.55;
   display: flex;
   align-items: center;
   gap: 9px;
-  box-shadow: 4px 4px 0 rgba(20, 18, 10, 0.22);
+  box-shadow: var(--shadow-soft);
   animation: toastIn 0.26s var(--ease);
   max-width: 100%;
 }
@@ -911,7 +919,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 
 .foot__col h4 {
   font-family: var(--f-mono);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 400;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -935,7 +943,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   flex-wrap: wrap;
   padding-top: 22px;
   font-family: var(--f-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.1em;
   color: rgba(242, 236, 221, 0.42);
   position: relative;
@@ -965,7 +973,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 
 /* ---------- page head ---------- */
 .page-head {
-  border-bottom: 1px solid var(--ink);
+  border-bottom: 1px solid var(--line-strong);
   padding: 46px 0 38px;
   position: relative;
   overflow: hidden;
@@ -1032,7 +1040,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .pstat b i { font-style: normal; color: var(--red); }
 .pstat span {
   font-family: var(--f-mono);
-  font-size: 9.5px;
+  font-size: 11px;
   letter-spacing: 0.15em;
   text-transform: uppercase;
   color: var(--ink-55);
