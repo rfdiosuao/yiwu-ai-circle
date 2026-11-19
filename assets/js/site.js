@@ -80,28 +80,29 @@
       p.dataset.seq = String(seqCounter--);
     });
 
-    var likesStore = U.store.get(U.keys.likes, {});
-    var commentsStore = U.store.get(U.keys.comments || "ywai.comments.v1", {});
-
-    function persistLikes() { U.store.set(U.keys.likes, likesStore); }
-    function persistComments() { U.store.set("ywai.comments.v1", commentsStore); }
+    /* 点赞 / 收藏 / 评论都存在服务端：/api/posts */
+    var reactions = {};   // postId -> { likes, marks, liked, marked }
+    var commentsStore = {}; // postId -> [{ name, text, at }]
+    var TONE_CLASS = ["", "avatar--red", "avatar--teal", "avatar--gold"];
 
     function paintActs(postEl) {
       var id = postEl.dataset.post;
-      var state = likesStore[id] || {};
+      var state = reactions[id] || {};
       var likeBtn = postEl.querySelector('[data-act="like"]');
       var markBtn = postEl.querySelector('[data-act="mark"]');
       if (likeBtn) {
         var base = Number(likeBtn.dataset.base) || 0;
         likeBtn.classList.toggle("is-on", !!state.liked);
+        likeBtn.setAttribute("aria-pressed", state.liked ? "true" : "false");
         var span = likeBtn.querySelector("[data-n]");
-        if (span) span.textContent = base + (state.liked ? 1 : 0);
+        if (span) span.textContent = base + (state.likes || 0);
       }
       if (markBtn) {
         var mb = Number(markBtn.dataset.base) || 0;
         markBtn.classList.toggle("is-on", !!state.marked);
+        markBtn.setAttribute("aria-pressed", state.marked ? "true" : "false");
         var ms = markBtn.querySelector("[data-n]");
-        if (ms) ms.textContent = mb + (state.marked ? 1 : 0);
+        if (ms) ms.textContent = mb + (state.marks || 0);
       }
     }
 
@@ -112,7 +113,7 @@
       var list = commentsStore[id] || [];
       var html = list.map(function (c) {
         return '<div class="cmt"><b>' + escapeHTML(c.name) +
-          "<span>" + escapeHTML(c.at) + "</span></b><p>" + escapeHTML(c.text) + "</p></div>";
+          "<span>" + escapeHTML(typeof c.at === "number" ? fmtTime(c.at) : c.at) + "</span></b><p>" + escapeHTML(c.text) + "</p></div>";
       }).join("");
       var old = box.querySelectorAll(".cmt");
       Array.prototype.forEach.call(old, function (n) { n.remove(); });
@@ -135,8 +136,11 @@
       node.dataset.seq = data.seq || "999999";
       node.innerHTML =
         '<div class="post__head">' +
-        '<span class="avatar avatar--red">' + escapeHTML(initials(data.name)) + "</span>" +
-        '<div class="post__who"><strong>' + escapeHTML(data.name || "圈友") +
+        '<span class="avatar ' + (TONE_CLASS[data.tone] || "avatar--red") + '">' + escapeHTML(initials(data.name)) + "</span>" +
+        '<div class="post__who"><strong>' +
+        (data.hasProfile && data.uid
+          ? '<a href="profile.html?id=' + encodeURIComponent(data.uid) + '" title="查看 ' + escapeHTML(data.name) + ' 的主页">' + escapeHTML(data.name || "圈友") + "</a>"
+          : escapeHTML(data.name || "圈友")) +
         ' <span class="tag tag--red">' + (fresh ? "刚刚发布" : "圈友发帖") + "</span></strong>" +
         "<span>义乌 · " + escapeHTML(data.tag) + " · " + escapeHTML(fmtTime(data.at)) + "</span></div></div>" +
         '<div class="post__title">' + escapeHTML(data.title) + "</div>" +
@@ -145,7 +149,7 @@
         '<button class="act" type="button" data-act="like" data-base="0">♡ 赞 <span data-n>0</span></button>' +
         '<button class="act" type="button" data-act="comment" data-base="0">◌ 评论 <span data-n>0</span></button>' +
         '<button class="act" type="button" data-act="mark" data-base="0">◇ 收藏 <span data-n>0</span></button>' +
-        '<span class="tag" style="margin-left:auto">' + escapeHTML(data.tag) + "</span></div>" +
+        (data.mine ? '<button class="act act--danger" type="button" data-act="delete" style="margin-left:auto">删除</button>' : '<span class="tag" style="margin-left:auto">' + escapeHTML(data.tag) + "</span>") + "</div>" +
         '<div class="post__comments"><div class="cmt-form">' +
         '<input type="text" placeholder="写下你的回应…" maxlength="120" aria-label="评论内容">' +
         '<button class="btn btn--sm btn--ghost" type="button" data-cmt-send>发送</button>' +
@@ -153,24 +157,42 @@
       return node;
     }
 
-    var savedMine = U.store.get("ywai.mine.v1", []);
-    savedMine.slice().reverse().forEach(function (p) {
-      var el = buildPost(p);
-      feed.insertBefore(el, feed.firstElementChild);
-      paintActs(el);
-      paintComments(el);
-    });
+    function isMine(p) {
+      var me = A.getSession();
+      return !!(me && me.userId && p.uid === me.userId);
+    }
+
+    function loadFeed() {
+      return A.api("GET", "/api/posts").then(function (r) {
+        if (!r.ok) return;
+        reactions = r.reactions || {};
+        commentsStore = r.comments || {};
+        Array.prototype.forEach.call(feed.querySelectorAll(".post[data-server]"), function (n) { n.remove(); });
+        (r.posts || []).slice().reverse().forEach(function (p) {
+          p.mine = isMine(p);
+          var el = buildPost(p);
+          el.dataset.server = "1";
+          el.dataset.seq = String(200000 + Math.floor(p.at / 1000));
+          if (Date.now() - p.at > 60 * 1000) el.classList.remove("is-fresh");
+          feed.insertBefore(el, feed.firstElementChild);
+        });
+        Array.prototype.forEach.call(feed.querySelectorAll(".post"), function (postEl) {
+          paintActs(postEl);
+          paintComments(postEl);
+        });
+        syncFeedCount();
+        var active = document.querySelector("[data-filter-tag].is-on");
+        if (active) active.click();
+      });
+    }
 
     function syncFeedCount() {
       var el = document.querySelector("[data-feed-count]");
       if (el) el.textContent = feed.querySelectorAll(".post").length;
     }
     syncFeedCount();
-
-    Array.prototype.forEach.call(document.querySelectorAll(".post"), function (postEl) {
-      paintActs(postEl);
-      paintComments(postEl);
-    });
+    loadFeed();
+    A.onChange(function () { loadFeed(); });
 
     feed.addEventListener("click", function (e) {
       var postEl = e.target.closest(".post");
@@ -191,15 +213,26 @@
           }
           return;
         }
+        if (kind === "delete") {
+          if (!window.confirm("确定删除这条帖子吗？删除后无法恢复。")) return;
+          A.api("DELETE", "/api/posts/" + encodeURIComponent(id)).then(function (r) {
+            if (!r.ok) { U.toast(r.msg || "删除失败"); return; }
+            postEl.remove();
+            syncFeedCount();
+            paintLiveStats();
+            U.toast("帖子已删除");
+          });
+          return;
+        }
         A.requireAuth("参与互动需要先登录，用手机号 10 秒入场。", function () {
-          var state = likesStore[id] || (likesStore[id] = {});
-          if (kind === "like") state.liked = !state.liked;
-          if (kind === "mark") {
-            state.marked = !state.marked;
-            U.toast(state.marked ? "已收藏这条帖子" : "已取消收藏");
-          }
-          persistLikes();
-          paintActs(postEl);
+          act.disabled = true;
+          A.api("POST", "/api/posts/" + encodeURIComponent(id) + "/react", { kind: kind }).then(function (r) {
+            act.disabled = false;
+            if (!r.ok) { U.toast(r.msg || "操作失败，请重试"); return; }
+            reactions[id] = { likes: r.likes, marks: r.marks, liked: r.liked, marked: r.marked };
+            if (kind === "mark") U.toast(r.marked ? "已收藏这条帖子" : "已取消收藏");
+            paintActs(postEl);
+          });
         });
         return;
       }
@@ -209,13 +242,17 @@
         var input = postEl.querySelector(".cmt-form input");
         var text = input ? input.value.trim() : "";
         if (!text) return;
-        A.requireAuth("发评论前先登录一下。", function (session) {
-          var list = commentsStore[id] || (commentsStore[id] = []);
-          list.unshift({ name: session.nickname, text: text, at: fmtTime(Date.now()) });
-          persistComments();
-          paintComments(postEl);
-          if (input) input.value = "";
-          U.toast("评论已发布");
+        A.requireAuth("发评论前先登录一下。", function () {
+          send.disabled = true;
+          A.api("POST", "/api/posts/" + encodeURIComponent(id) + "/comments", { text: text }).then(function (r) {
+            send.disabled = false;
+            if (!r.ok) { U.toast(r.msg || "评论失败，请重试"); return; }
+            var list = commentsStore[id] || (commentsStore[id] = []);
+            list.unshift(r.comment);
+            paintComments(postEl);
+            if (input) input.value = "";
+            U.toast("评论已发布");
+          });
         });
       }
     });
@@ -296,31 +333,30 @@
             body = val;
           }
           var tag = topic ? topic.value : "闲聊";
-          var post = {
-            id: "u" + Date.now(),
-            title: title,
-            body: body,
-            tag: tag,
-            at: Date.now(),
-            name: session.nickname,
-            seq: "999999"
-          };
-          var node = buildPost(post);
-
-          var first = feed.querySelector(".post");
-          if (first) feed.insertBefore(node, first);
-          else feed.appendChild(node);
-
-          var saved = U.store.get("ywai.mine.v1", []);
-          saved.unshift(post);
-          U.store.set("ywai.mine.v1", saved.slice(0, 30));
-
-          text.value = "";
-          if (counter) counter.textContent = "0 / 400";
-          syncFeedCount();
-          paintLiveStats();
-          U.toast("发布成功，已发到社区");
-          paintComments(node);
+          if (submit) U.busy(submit, true);
+          A.api("POST", "/api/posts", { title: title, body: body, tag: tag }).then(function (r) {
+            if (submit) U.busy(submit, false);
+            if (!r.ok) {
+              if (r.status === 401) { A.openGate("登录已过期，请重新登录后再发。"); return; }
+              U.toast(r.msg || "发布失败，请重试");
+              return;
+            }
+            var post = r.post;
+            post.mine = true;
+            var node = buildPost(post);
+            node.dataset.server = "1";
+            node.dataset.seq = String(200000 + Math.floor(post.at / 1000));
+            var first = feed.querySelector(".post");
+            if (first) feed.insertBefore(node, first);
+            else feed.appendChild(node);
+            text.value = "";
+            if (counter) counter.textContent = "0 / 400";
+            syncFeedCount();
+            paintLiveStats();
+            U.toast("发布成功，已发到社区");
+            paintActs(node);
+            paintComments(node);
+          });
         });
       }
     }
@@ -556,12 +592,6 @@
       "金师傅": "13733335518",
       "圈助手": "13000000000"
     };
-    try {
-      var stored = JSON.parse(localStorage.getItem("ywai.profiles.v1") || "{}");
-      Object.keys(stored).forEach(function (phone) {
-        if (stored[phone] && stored[phone].nickname) known[stored[phone].nickname] = phone;
-      });
-    } catch (e) {}
 
     Array.prototype.forEach.call(document.querySelectorAll(".post__who strong"), function (strong) {
       var node = strong.firstChild;
@@ -596,42 +626,32 @@
     return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
   }
 
-  function approvedFromAdmin() {
-    try {
-      var db = JSON.parse(localStorage.getItem("ywai.admin.db.v1") || "null");
-      if (!db || !Array.isArray(db.merchants)) return 0;
-      return db.merchants.filter(function (m) { return m && m.status === "approved"; }).length;
-    } catch (e) { return 0; }
-  }
+  var serverStats = null;
 
   function liveCounts() {
-    var mine = U.store.get("ywai.mine.v1", []);
-    var today = dayKey(Date.now());
-    var myToday = (Array.isArray(mine) ? mine : []).filter(function (p) {
-      return p && p.at && dayKey(p.at) === today;
-    }).length;
     return {
-      posts: BASE_POSTS_TODAY + myToday,
-      merchants: Math.max(BASE_MERCHANTS, approvedFromAdmin())
+      posts: BASE_POSTS_TODAY + (serverStats ? serverStats.postsToday || 0 : 0),
+      merchants: Math.max(BASE_MERCHANTS, serverStats && serverStats.merchants ? serverStats.merchants : 0)
     };
   }
 
   function paintLiveStats() {
-    var n = liveCounts();
-    Array.prototype.forEach.call(document.querySelectorAll('[data-stat="posts-today"]'), function (el) {
-      el.textContent = n.posts;
-      el.title = "今天社区实际发布 " + n.posts + " 条（含你在本机发布的）";
-    });
-    Array.prototype.forEach.call(document.querySelectorAll('[data-stat="merchants"]'), function (el) {
-      el.textContent = n.merchants;
-      el.title = "商家名录中已认证 " + n.merchants + " 家";
+    A.api("GET", "/api/stats").then(function (r) {
+      if (r.ok) serverStats = r;
+      var n = liveCounts();
+      Array.prototype.forEach.call(document.querySelectorAll('[data-stat="posts-today"]'), function (el) {
+        el.textContent = n.posts;
+        el.title = "今天社区发布 " + n.posts + " 条";
+      });
+      Array.prototype.forEach.call(document.querySelectorAll('[data-stat="merchants"]'), function (el) {
+        el.textContent = n.merchants;
+        if (el.hasAttribute("data-count")) el.setAttribute("data-count", n.merchants);
+        el.title = "商家名录中已认证 " + n.merchants + " 家";
+      });
     });
   }
 
   paintLiveStats();
-  window.addEventListener("storage", function (e) {
-    if (!e.key || e.key === "ywai.mine.v1" || e.key === "ywai.admin.db.v1") paintLiveStats();
-  });
   document.addEventListener("visibilitychange", function () {
     if (!document.hidden) paintLiveStats();
   });

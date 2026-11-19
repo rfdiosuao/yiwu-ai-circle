@@ -13,11 +13,13 @@
 
   var params = new URLSearchParams(location.search);
   var session = A.getSession();
-  var phone = params.get("u") || (session && session.phone) || "";
+  var byId = params.get("id") || "";
+  var phone = params.get("u") || (!byId && session && session.phone) || "";
 
-  var all = loadAll();
-  var profile = phone ? all[phone] : null;
-  var isOwner = !!(session && profile && session.phone === phone);
+  var profile = null;
+  var isOwner = false;
+  var serverPosts = [];
+  var serverLikes = 0;
 
   var state = { draft: null, theme: "paper", tone: 1 };
 
@@ -157,26 +159,8 @@
     };
   }
 
-  function loadAll() {
-    try {
-      var raw = localStorage.getItem(PKEY);
-      if (raw) {
-        var parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === "object") return parsed;
-      }
-    } catch (e) {}
-    var s = seedProfiles();
-    try { localStorage.setItem(PKEY, JSON.stringify(s)); } catch (e) {}
-    return s;
-  }
-
-  function persist() {
-    try {
-      localStorage.setItem(PKEY, JSON.stringify(all));
-      return true;
-    } catch (e) {
-      return false;
-    }
+  function persist(draft) {
+    return A.api("PUT", "/api/profiles/me", { profile: draft });
   }
 
   function defaultProfile(sess) {
@@ -199,37 +183,18 @@
   }
 
   /* ---------------- derived ---------------- */
-  function adminPosts() {
-    try {
-      var db = JSON.parse(localStorage.getItem("ywai.admin.db.v1") || "null");
-      if (!db || !db.posts) return [];
-      return db.posts.filter(function (p) {
-        return p.author === profile.nickname && p.status !== "hidden";
-      });
-    } catch (e) {
-      return [];
-    }
-  }
-
-  function myPosts() {
-    try {
-      var mine = JSON.parse(localStorage.getItem("ywai.mine.v1") || "[]");
-      return mine.filter(function (p) { return p.name === profile.nickname; });
-    } catch (e) {
-      return [];
-    }
-  }
-
   function stats() {
-    var a = adminPosts();
-    var m = myPosts();
-    var likes = a.reduce(function (s, p) { return s + (p.likes || 0); }, 0);
     return {
-      posts: a.length + m.length,
-      likes: likes,
+      posts: serverPosts.length,
+      likes: serverLikes,
       days: daysSince(profile.joined),
       photos: profile.gallery ? profile.gallery.length : 0
     };
+  }
+
+  function fmtDate(ts) {
+    var d = new Date(ts);
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
   }
 
   /* ---------------- render ---------------- */
@@ -328,16 +293,10 @@
 
   function renderPosts() {
     var box = $("#pPosts");
-    var a = adminPosts().slice(0, 3);
-    var m = myPosts().slice(0, 3);
-    var rows = a.map(function (p) {
-      return '<div class="ppost"><div><strong>' + esc(p.title) + "</strong>" +
-        "<span>" + esc(p.tag) + " · " + esc(p.date) + "</span></div>" +
-        "<em>" + p.likes + " 赞 · " + p.comments + " 评</em></div>";
-    }).concat(m.map(function (p) {
-      return '<div class="ppost"><div><strong>' + esc(p.title) + "</strong>" +
-        "<span>" + esc(p.tag) + " · 圈友发帖</span></div><em>—</em></div>";
-    }));
+    var rows = serverPosts.slice(0, 4).map(function (p) {
+      return '<a class="ppost" href="posts.html"><div><strong>' + esc(p.title) + "</strong>" +
+        "<span>" + esc(p.tag) + " · " + esc(fmtDate(p.at)) + "</span></div><em>查看 →</em></a>";
+    });
 
     if (!rows.length) {
       box.innerHTML = '<div class="pempty"><strong>还没有发过帖</strong>' +
@@ -687,46 +646,62 @@
     state.draft.tone = state.tone;
     state.draft.updated = today();
 
-    all[phone] = state.draft;
-    if (!persist()) {
-      toast("图片太多，浏览器存不下了。删掉两张再试。");
-      return;
-    }
-
-    profile = state.draft;
-    closeEditor();
-    render();
-    toast("主页已更新");
+    var saveBtn = $("#editSave");
+    saveBtn.disabled = true;
+    persist(state.draft).then(function (r) {
+      saveBtn.disabled = false;
+      if (!r.ok) {
+        toast(r.status === 413 ? "图片太大了，删掉两张再试" : (r.msg || "保存失败，请重试"));
+        return;
+      }
+      profile = r.profile;
+      if (r.user) A.updateSession({ nickname: r.user.nickname, tone: r.user.tone });
+      closeEditor();
+      render();
+      toast("主页已更新");
+    });
   });
 
   /* ---------------- boot ---------------- */
+  function notFound(title, desc) {
+    $("#nfTitle").textContent = title;
+    $("#nfDesc").textContent = desc;
+    $("#profileMain").hidden = true;
+    $("#notFound").hidden = false;
+  }
+
   (function boot() {
-    if (!phone) {
-      $("#nfTitle").textContent = "先登录，再装扮";
-      $("#nfDesc").textContent = "每个手机号对应一个主页。登录后就能写下你在义乌做的事，加上电话、微信和照片。";
-      $("#profileMain").hidden = true;
-      $("#notFound").hidden = false;
+    if (!phone && !byId) {
+      notFound("先登录，再装扮", "每个手机号对应一个主页。登录后就能写下你在义乌做的事，加上电话、微信和照片。");
       return;
     }
 
-    if (!profile) {
-      if (session && session.phone === phone) {
-        profile = defaultProfile(session);
-        all[phone] = profile;
-        persist();
-      } else {
-        $("#nfTitle").textContent = "这个主页还没被布置";
-        $("#nfDesc").textContent = phone.replace(/(\d{3})\d{4}(\d{4})/, "$1 **** $2") +
-          " 还没有填写主页资料。";
-        $("#profileMain").hidden = true;
-        $("#notFound").hidden = false;
+    var q = byId ? "id=" + encodeURIComponent(byId) : "u=" + encodeURIComponent(phone);
+    A.api("GET", "/api/profiles?" + q).then(function (r) {
+      if (!r.ok) {
+        notFound("主页暂时打不开", r.status === 0 ? "网络异常，请稍后刷新重试。" : "这个链接不正确。");
         return;
       }
-    }
+      isOwner = !!r.isOwner;
+      session = A.getSession();
+      serverPosts = r.posts || [];
+      serverLikes = r.likes || 0;
+      var seeds = seedProfiles();
 
-    isOwner = !!(session && session.phone === phone);
-    $("#notFound").hidden = true;
-    $("#profileMain").hidden = false;
-    render();
+      if (r.profile) {
+        profile = r.profile;
+      } else if (phone && seeds[phone]) {
+        profile = seeds[phone];
+      } else if (isOwner && session) {
+        profile = defaultProfile(session);
+      } else {
+        notFound("这个主页还没被布置", (phone ? phone.replace(/(\d{3})\d{4}(\d{4})/, "$1 **** $2") : "这位圈友") + " 还没有填写主页资料。");
+        return;
+      }
+
+      $("#notFound").hidden = true;
+      $("#profileMain").hidden = false;
+      render();
+    });
   })();
 })();

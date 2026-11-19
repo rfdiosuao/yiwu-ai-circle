@@ -236,8 +236,7 @@
     U.busy(btn, true);
     pwForm.dataset.locked = "1";
 
-    setTimeout(function () {
-      var r = A.loginWithPassword(v.value, pwInput.value, remember ? remember.checked : true);
+    A.loginWithPassword(v.value, pwInput.value, remember ? remember.checked : true).then(function (r) {
       U.busy(btn, false);
       pwForm.dataset.locked = "0";
       if (!r.ok) {
@@ -249,7 +248,7 @@
       }
       U.store.set("ywai.lastPhone", v.value);
       finish(r.user, remember ? remember.checked : true);
-    }, 700);
+    });
   });
 
   /* ---------------- profile step (new account) ---------------- */
@@ -313,12 +312,16 @@
         return;
       }
     }
-    var user = A.upsertUser(pending.phone, {
-      nickname: nv.value,
-      tone: A.toneFor(pending.phone),
-      pw: pw ? A.hash(pw) : ""
+    var btn = profileForm.querySelector("[data-submit]") || profileForm.querySelector("button[type='submit']");
+    U.busy(btn, true);
+    A.saveMe({ nickname: nv.value, tone: A.toneFor(pending.phone), password: pw }).then(function (r) {
+      U.busy(btn, false);
+      if (!r.ok) {
+        U.setStatus(profileForm, "error", r.msg);
+        return;
+      }
+      finish(r.user, true);
     });
-    finish(user, true);
   });
 
   /* ---------------- done ---------------- */

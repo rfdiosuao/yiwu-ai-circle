@@ -1422,7 +1422,8 @@
         '<div class="panel__body" style="display:grid;gap:10px">' +
         '<button class="btn btn--ghost btn--sm" type="button" data-act="data:export">导出 JSON 备份</button>' +
         '<button class="btn btn--ghost btn--sm" type="button" data-act="data:reset">恢复演示数据</button>' +
-        '<p class="dhint">所有数据存在当前浏览器的 localStorage（键 ' + DB.KEY + '）。</p>' +
+        '<p class="dhint">数据保存在服务器（data/db.json），修改后自动同步。' +
+        (DB.live ? "当前真实注册用户 " + DB.live.users + " 人，社区发帖 " + DB.live.posts + " 条，认证申请 " + DB.live.applications.length + " 份。" : "") + '</p>' +
         "</div></div>" +
 
         "</div></div></form>";
@@ -1761,7 +1762,7 @@
         });
         break;
       }
-      case "data:reset-confirm": DB.reset(); location.reload(); break;
+      case "data:reset-confirm": DB.reset().then(function () { location.reload(); }); break;
     }
   });
 
@@ -1814,14 +1815,6 @@
   var fails = 0;
   var lockUntil = 0;
 
-  function session() {
-    try {
-      var s = JSON.parse(localStorage.getItem(SKEY) || "null");
-      if (!s || !s.exp || s.exp < Date.now()) return null;
-      return s;
-    } catch (e) { return null; }
-  }
-
   function showApp() {
     gate.style.display = "none";
     app.hidden = false;
@@ -1850,15 +1843,19 @@
     }
     gateBtn.disabled = true;
     gateBtn.textContent = "核对中…";
-    setTimeout(function () {
+    DB.login(u, p).then(function (r) {
+      if (r.ok) return DB.pull().then(function () { return r; });
+      return r;
+    }).then(function (r) {
       gateBtn.disabled = false;
       gateBtn.textContent = "进入后台";
-      var s = db.settings.admin;
-      if (u === s.user && p === s.pass) {
-        localStorage.setItem(SKEY, JSON.stringify({ user: u, at: Date.now(), exp: Date.now() + 8 * 3600e3 }));
+      if (r.ok) {
         gateErr.classList.remove("is-on");
         showApp();
-        toast("欢迎回来，" + s.name);
+        toast("欢迎回来，" + (db.settings.admin.name || "管理员"));
+      } else if (r.status === 429 || r.status === 0) {
+        gateErr.textContent = r.message || "请稍后再试";
+        gateErr.classList.add("is-on");
       } else {
         fails++;
         if (fails >= 5) {
@@ -1874,12 +1871,16 @@
         void gateForm.offsetWidth;
         gateForm.classList.add("shake");
       }
-    }, 520);
+    });
   });
 
   document.getElementById("sideOut").addEventListener("click", function () {
     localStorage.removeItem(SKEY);
-    location.reload();
+    DB.logout().then(function () { location.reload(); });
+  });
+
+  DB.onSync(function (state) {
+    if (state === "error") toast("同步到服务器失败，请检查网络或重新登录");
   });
 
   /* ---------------- boot ---------------- */
@@ -1888,9 +1889,14 @@
     return d.getFullYear() + " · " + String(d.getMonth() + 1).padStart(2, "0") + " · " + String(d.getDate()).padStart(2, "0");
   })();
 
-  if (session()) {
-    showApp();
-  } else {
+  gate.style.display = "none";
+  app.hidden = true;
+  DB.pull().then(function (r) {
+    if (r.ok) { showApp(); return; }
+    showGate();
+  });
+
+  function showGate() {
     gate.style.display = "grid";
     app.hidden = true;
     gateUser.value = db.settings.admin.user;

@@ -1,6 +1,7 @@
 /* ==========================================================================
    义乌AI圈 · 后台数据层
-   单机演示数据库：localStorage 持久化，结构与真实后端表一一对应。
+   整库文档存服务端（/api/admin/db），localStorage 只做离线缓存。
+   登录后台后先 pull() 拉取服务端数据，之后每次 save() 自动回写。
    ========================================================================== */
 (function () {
   "use strict";
@@ -247,14 +248,87 @@
   db = migrate(db);
   try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) {}
 
-  function save() {
+  /* ---------------- 服务端同步 ---------------- */
+  var online = false;
+  var pushTimer = null;
+  var listeners = [];
+
+  function req(method, url, body) {
+    return fetch(url, {
+      method: method,
+      credentials: "same-origin",
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        d.status = r.status;
+        if (!r.ok && d.ok === undefined) d.ok = false;
+        return d;
+      });
+    }, function () {
+      return { ok: false, status: 0, message: "网络异常，请稍后再试" };
+    });
+  }
+
+  function notify(state) {
+    listeners.forEach(function (fn) { try { fn(state); } catch (e) {} });
+  }
+
+  function push() {
+    clearTimeout(pushTimer);
+    pushTimer = null;
+    if (!online) return Promise.resolve({ ok: false });
+    notify("saving");
+    return req("PUT", "/api/admin/db", { doc: db }).then(function (r) {
+      if (r.status === 401) online = false;
+      notify(r.ok ? "saved" : "error");
+      return r;
+    });
+  }
+
+  function replace(doc) {
+    Object.keys(db).forEach(function (k) { delete db[k]; });
+    var next = migrate(doc);
+    Object.keys(next).forEach(function (k) { db[k] = next[k]; });
     try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) {}
   }
 
+  /* 拉取服务端数据：已有则覆盖本地；服务端为空则把本地（演示种子）上传一份。 */
+  function pull() {
+    return req("GET", "/api/admin/db").then(function (r) {
+      if (!r.ok) return r;
+      online = true;
+      if (r.doc) replace(r.doc);
+      else push();
+      window.AdminDB.live = r.live || null;
+      return r;
+    });
+  }
+
+  function login(user, pass) {
+    return req("POST", "/api/admin/login", { user: user, pass: pass });
+  }
+
+  function logout() {
+    online = false;
+    return req("POST", "/api/admin/logout");
+  }
+
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) {}
+    if (online) {
+      clearTimeout(pushTimer);
+      pushTimer = setTimeout(push, 400);
+    }
+  }
+
+  window.addEventListener("pagehide", function () {
+    if (pushTimer && online) push();
+  });
+
   function reset() {
-    db = seed();
-    save();
-    return db;
+    replace(seed());
+    return push();
   }
 
   function nextId(prefix, list, pad) {
@@ -301,6 +375,12 @@
     fresh: fresh,
     save: save,
     reset: reset,
+    pull: pull,
+    push: push,
+    login: login,
+    logout: logout,
+    onSync: function (fn) { listeners.push(fn); },
+    isOnline: function () { return online; },
     seed: seed,
     nextId: nextId,
     orderId: orderId,
