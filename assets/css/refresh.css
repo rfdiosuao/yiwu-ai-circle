@@ -1,0 +1,354 @@
+/* ==========================================================================
+   义乌AI圈 · UI refresh（SaaS 社区 × 义乌账本）
+   放在所有样式之后加载：统一卡片、圆角、阴影、导航和按钮的现代化处理，
+   保留朱红、宋体标题、印章、铺位号等品牌元素。
+   ========================================================================== */
+
+body {
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--ink);
+  background:
+    radial-gradient(1200px 520px at 85% -120px, rgba(200, 56, 30, 0.06), transparent 70%),
+    var(--paper);
+}
+
+.mono { font-size: 11.5px; letter-spacing: 0.1em; }
+
+/* ---------- 顶栏 ---------- */
+.ticker { height: 32px; }
+.ticker__item { color: rgba(246, 243, 236, 0.72); }
+
+.masthead {
+  background: rgba(246, 243, 236, 0.8);
+  backdrop-filter: saturate(1.4) blur(14px);
+  -webkit-backdrop-filter: saturate(1.4) blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+
+.brand__logo { height: 40px; }
+
+.nav { gap: 2px; padding: 4px; border-radius: 999px; background: rgba(23, 21, 15, 0.04); }
+.nav a {
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-size: 14px;
+  color: var(--ink-70);
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+.nav a i { display: none; }
+.nav a::after { display: none; }
+.nav a:hover { background: rgba(255, 255, 255, 0.7); color: var(--ink); }
+.nav a.is-active {
+  background: var(--card);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(23, 21, 15, 0.06), 0 4px 12px -6px rgba(23, 21, 15, 0.18);
+}
+
+.user-menu__btn { border-radius: 999px; }
+.user-menu__panel {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lift);
+  overflow: hidden;
+}
+
+/* ---------- 按钮 ---------- */
+.btn {
+  border-radius: var(--r-btn);
+  letter-spacing: 0.02em;
+  font-weight: 600;
+}
+.btn:hover { transform: translateY(-1px); box-shadow: 0 8px 20px -10px rgba(23, 21, 15, 0.45); }
+.btn:active { transform: translateY(0); box-shadow: none; }
+.btn--red { background: linear-gradient(180deg, #d4452a, var(--red)); }
+.btn--red:hover { box-shadow: 0 10px 24px -10px rgba(200, 56, 30, 0.7); }
+.btn--ghost {
+  --btn-bg: var(--card);
+  --btn-bd: var(--ink-20);
+}
+.btn--ghost:hover { --btn-bd: var(--ink-40); box-shadow: var(--shadow-soft); }
+.btn--paper { --btn-bd: var(--ink-20); }
+.btn--sm { height: 36px; border-radius: 9px; }
+.btn--lg { height: 52px; border-radius: 12px; }
+
+.link-arrow {
+  border-bottom: 0;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: none;
+}
+.link-arrow:hover { color: var(--red); box-shadow: inset 0 0 0 1px rgba(200, 56, 30, 0.4); }
+
+/* ---------- 区块 ---------- */
+.sec { padding: 76px 0; border-top: 0; }
+.sec + .sec::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: min(var(--wrap), 100% - var(--gut) * 2);
+  transform: translateX(-50%);
+  height: 1px;
+  background: var(--line);
+}
+.sec-head { margin-bottom: 36px; }
+.sec-head__idx b {
+  display: inline-grid;
+  place-items: center;
+  min-width: 30px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--red-soft);
+  letter-spacing: 0.04em;
+}
+.sec-head__idx span::before { display: none; }
+.sec-title { font-family: var(--f-serif); letter-spacing: -0.01em; }
+.sec-sub { font-size: 15px; color: var(--ink-55); }
+.sec-foot-note { font-size: 11.5px; letter-spacing: 0.06em; text-transform: none; }
+
+/* ---------- 标签 / chips ---------- */
+.tag {
+  height: 24px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(23, 21, 15, 0.05);
+  font-family: var(--f-sans);
+  font-size: 12px;
+  letter-spacing: 0;
+  color: var(--ink-70);
+}
+.tag--red { background: var(--red-soft); color: var(--red); }
+.tag--ink { background: var(--ink); color: var(--paper); }
+.tag--teal { background: rgba(20, 98, 90, 0.09); color: var(--teal); }
+
+.chip { background: var(--card); border-color: var(--line-strong); }
+.chip:hover { border-color: var(--ink-40); }
+.chip.is-on { background: var(--ink); border-color: var(--ink); }
+
+.verified {
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+/* ---------- 统一卡片 ---------- */
+.card,
+.gate,
+.pulse-card,
+.smini,
+.good,
+.merchant,
+.outpost,
+.composer,
+.rail__box,
+.post {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-soft);
+}
+
+.gate,
+.pulse-card,
+.smini,
+.good,
+.merchant,
+.outpost {
+  transition: transform 0.3s var(--ease), box-shadow 0.3s var(--ease), border-color 0.3s;
+}
+
+.gate:hover,
+.pulse-card:hover,
+.smini:hover,
+.good:hover,
+.merchant:hover,
+.outpost:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lift);
+  border-color: var(--line-strong);
+  background: var(--card);
+}
+
+/* 原来靠 1px 黑色间隙拼出的格子，改成有间距的卡片网格 */
+.gates,
+.shelf-mini {
+  background: transparent;
+  border: 0;
+  gap: 16px;
+}
+.gate { overflow: hidden; }
+.gate::before { height: 3px; border-radius: 0 0 3px 3px; }
+.gate h3 { font-family: var(--f-serif); }
+.gate__go {
+  border-radius: 999px;
+  transition: background 0.25s, color 0.25s, transform 0.25s var(--ease);
+}
+.gate:hover .gate__go { background: var(--red); border-color: var(--red); color: #fff; transform: translateX(3px); }
+
+.pulse { gap: 16px; }
+.smini__price b { font-family: var(--f-serif); }
+
+/* ---------- 首页 · 商家名录 ---------- */
+.dir {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--card);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+.dir-row { padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.dir-row:last-child { border-bottom: 0; }
+.dir-row:hover { background: #fcfaf6; }
+
+/* ---------- 首页 · 横幅 ---------- */
+.band { border-radius: 0; }
+.band__q { font-family: var(--f-serif); }
+
+/* ---------- 首页 · Hero ---------- */
+.hero__strip {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.55);
+}
+.hstat b { font-family: var(--f-serif); }
+.stall-card {
+  border-radius: 14px;
+  border-color: var(--line-strong);
+  background: var(--card);
+}
+.stall-card--main { box-shadow: 0 2px 6px rgba(23, 21, 15, 0.06), 0 40px 70px -30px rgba(23, 21, 15, 0.35); }
+.hero__badge { border-radius: 10px; }
+
+/* ---------- 线下据点 ---------- */
+.outpost { overflow: hidden; }
+.outpost__sign {
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgba(200, 56, 30, 0.1), transparent 60%),
+    linear-gradient(180deg, #faf6ef, #f1ebdf);
+  border-bottom: 1px solid var(--line);
+}
+.outpost__sign .cn { font-family: var(--f-serif); }
+
+/* ---------- 页头 ---------- */
+.page-head { border-bottom: 1px solid var(--line); }
+.page-head h1 { font-family: var(--f-serif); }
+.pstat b { font-family: var(--f-serif); }
+
+/* ---------- 社区 ---------- */
+.feed,
+[data-feed] { display: grid; gap: 12px; }
+.post {
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid var(--line);
+  transition: box-shadow 0.25s, border-color 0.25s;
+}
+.post:hover { border-color: var(--line-strong); box-shadow: var(--shadow-lift); }
+.post.is-hot::before { left: 0; top: 26px; height: 32px; width: 3px; border-radius: 0 3px 3px 0; }
+.post.is-fresh { box-shadow: 0 0 0 2px rgba(200, 56, 30, 0.18), var(--shadow-soft); }
+.post__title { font-size: 18px; line-height: 1.5; }
+.post__who a { border-bottom: 0 !important; color: inherit; }
+.post__who a:hover { color: var(--red); }
+
+.act {
+  border-radius: 999px;
+  padding: 5px 12px;
+  transition: background 0.2s, color 0.2s;
+}
+.act:hover { background: rgba(23, 21, 15, 0.05); }
+.act.is-on { background: var(--red-soft); color: var(--red); }
+.act--danger { color: var(--ink-40); }
+.act--danger:hover { color: var(--red); background: var(--red-soft); }
+
+.post__comments { border-radius: 12px; }
+.cmt-form input { border-radius: 10px; }
+
+.composer { overflow: hidden; }
+.composer__bar { border-top: 1px solid var(--line); }
+
+.rail__box { padding: 18px; }
+.rail__item { border-radius: 10px; }
+
+/* ---------- AI 工具 ---------- */
+.good { overflow: hidden; }
+.good__media {
+  background:
+    radial-gradient(90% 120% at 100% 100%, rgba(200, 56, 30, 0.12), transparent 60%),
+    linear-gradient(135deg, #fbf8f2, #efe8da);
+  border-bottom: 1px solid var(--line);
+}
+.good__no { left: 12px; top: 12px; border-radius: 6px; }
+.good__flag { border-radius: 6px; }
+.good__big { opacity: 0.55; }
+
+.filterbar { border-color: var(--line); }
+.searchbox,
+.sortsel { border-radius: 10px; }
+
+/* ---------- 表单 ---------- */
+.input,
+.textarea,
+.composer__select,
+.phone-field,
+.otp__box {
+  border-radius: 10px;
+}
+.input:focus,
+.textarea:focus { box-shadow: 0 0 0 4px rgba(200, 56, 30, 0.1); border-color: var(--red); }
+
+/* ---------- 弹层 / 提示 ---------- */
+.modal__sheet { border-radius: 20px; border-color: var(--line); box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.45); }
+.modal__close { border-radius: 999px; }
+.toast { border-radius: 12px; box-shadow: var(--shadow-lift); }
+
+/* ---------- 页脚 ---------- */
+.site-foot { border-top: 0; }
+
+/* ---------- 无障碍：减少动效 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .gate:hover, .pulse-card:hover, .smini:hover, .good:hover, .merchant:hover, .outpost:hover { transform: none; }
+}
+
+/* ---------- 移动端 ---------- */
+@media (max-width: 760px) {
+  .sec { padding: 52px 0; }
+  .nav { background: transparent; padding: 0; }
+  .post { padding: 18px 16px 14px; }
+  .gates, .shelf-mini { gap: 12px; }
+  .dir-row { padding: 14px 16px; }
+}
+
+/* ---------- 商家认证 / 法务 / 个人主页 ---------- */
+.cert__panel,
+.cert__price-card,
+.cert__note,
+.scard,
+.pcard {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+.cert__price-card { box-shadow: var(--shadow-lift); }
+.cert__price b,
+.cert__price strong { font-family: var(--f-serif); }
+.legal__toc { border-radius: var(--r); }
+.pblock { border-top-color: var(--line); }
+.pedit { border-radius: 20px 0 0 20px; }
+
+.topic,
+.sortbtn,
+.rail__topics a { border-radius: 999px; }
+
+@media (max-width: 520px) {
+  .masthead__inner { gap: 10px; }
+  .brand__logo { height: 32px; }
+  .nav a { padding: 6px 6px; font-size: 13px; }
+  .nav { gap: 0; }
+}

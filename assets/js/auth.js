@@ -1,7 +1,7 @@
 /* ==========================================================================
-   义乌AI圈 — auth engine (demo, client-side)
-   Real flows, real validation, real session state — no backend.
-   NOTE: hashing here is a demo stand-in, not production cryptography.
+   义乌AI圈 — auth engine
+   会话由服务端 HttpOnly Cookie 承载；localStorage 只缓存展示用的昵称等信息，
+   启动时向 /api/auth/session 校准。验证码、密码、锁定都在服务端完成。
    ========================================================================== */
 (function () {
   "use strict";
@@ -32,7 +32,27 @@
     }
   };
 
-  /* ---------------- hashing (demo) ---------------- */
+  /* ---------------- server api ---------------- */
+  function api(method, url, body) {
+    return fetch(url, {
+      method: method,
+      credentials: "same-origin",
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function (r) {
+      return r.text().then(function (txt) {
+        var data = {};
+        try { data = txt ? JSON.parse(txt) : {}; } catch (e) {}
+        data.status = r.status;
+        if (!r.ok && data.ok === undefined) data.ok = false;
+        return data;
+      });
+    }, function () {
+      return { ok: false, status: 0, msg: "网络异常，请检查网络后重试" };
+    });
+  }
+
+  /* ---------------- hashing (legacy, unused) ---------------- */
   function hash(str) {
     var h = 2166136261, s = "ywai::v1::" + str;
     for (var i = 0; i < s.length; i++) {
@@ -64,10 +84,11 @@
   }
 
   function signIn(user, remember) {
-    var ttl = remember ? 30 * 864e5 : 12 * 36e5;
+    var ttl = remember === false ? 12 * 36e5 : 30 * 864e5;
     var session = {
       token: uid(),
-      phone: user.phone,
+      userId: user.userId || "",
+      phone: user.mobile || user.phone,
       nickname: user.nickname,
       tone: user.tone || 0,
       at: Date.now(),
@@ -81,6 +102,8 @@
 
   function signOut() {
     store.del(K.session);
+    lastUser = null;
+    api("POST", "/api/auth/logout");
     emit(null);
   }
 
@@ -109,26 +132,52 @@
     } catch (e) {}
   }
 
-  /* ---------------- users ---------------- */
-  function getUsers() { return store.get(K.users, {}); }
+  /* ---------------- users（服务端） ---------------- */
+  var lastUser = null; // 最近一次服务端返回的用户（验证码 / 密码登录后）
 
-  function findUser(phone) {
-    var u = getUsers()[phone];
-    return u || null;
+  function toLocalUser(u) {
+    if (!u) return null;
+    return {
+      userId: u.userId,
+      phone: u.mobile || u.phone,
+      mobile: u.mobile || u.phone,
+      nickname: u.nickname,
+      tone: u.tone || 1,
+      hasPassword: !!u.hasPassword
+    };
   }
 
+  /* 登录流程里用：验证通过且已完成注册的用户返回对象，新用户返回 null（需要先设置昵称）。 */
+  function findUser(phone) {
+    if (lastUser && lastUser.phone === phone && !lastUser.isNew) return lastUser;
+    var s = getSession();
+    if (s && s.phone === phone) return s;
+    return null;
+  }
+
+  /* 更新当前登录用户的昵称 / 头像色 / 密码，返回 Promise<{ok, user, msg}> */
+  function saveMe(patch) {
+    var body = {};
+    if (patch.nickname !== undefined) body.nickname = patch.nickname;
+    if (patch.tone !== undefined) body.tone = patch.tone;
+    if (patch.password) body.password = patch.password;
+    return api("PATCH", "/api/auth/me", body).then(function (r) {
+      if (!r.ok) return { ok: false, msg: r.msg || "保存失败，请重试" };
+      lastUser = toLocalUser(r.user);
+      if (getSession()) updateSession({ nickname: lastUser.nickname, tone: lastUser.tone });
+      return { ok: true, user: lastUser };
+    });
+  }
+
+  /* 兼容旧调用：同步返回合并后的用户，同时异步写到服务端。 */
   function upsertUser(phone, patch) {
-    var users = getUsers();
-    var u = users[phone] || {
-      phone: phone,
-      nickname: "",
-      tone: 0,
-      createdAt: Date.now()
-    };
-    for (var k in patch) if (Object.prototype.hasOwnProperty.call(patch, k)) u[k] = patch[k];
-    if (typeof u.tone !== "number") u.tone = 0;
-    users[phone] = u;
-    store.set(K.users, users);
+    var base = lastUser && lastUser.phone === phone ? lastUser : { phone: phone, mobile: phone, tone: 1 };
+    var u = {};
+    for (var k in base) if (Object.prototype.hasOwnProperty.call(base, k)) u[k] = base[k];
+    for (var j in patch) if (Object.prototype.hasOwnProperty.call(patch, j) && j !== "pw" && j !== "password") u[j] = patch[j];
+    u.isNew = false;
+    lastUser = u;
+    saveMe(patch);
     return u;
   }
 
@@ -194,124 +243,53 @@
     return Math.max(0, g.lockUntil - Date.now());
   }
 
-  /* ---------------- otp ---------------- */
-  var OTP_TTL = 5 * 60 * 1000;
-  var RESEND = 60 * 1000;
-
-  /* ---------------- SMS adapter（demo / real API） ---------------- */
+  /* ---------------- SMS / 登录（服务端完成） ---------------- */
   var SMS = (window.YW_CONFIG && window.YW_CONFIG.sms) || {};
   var SMS_MODE = SMS.mode === "api" ? "api" : "demo";
 
-  function postJSON(url, payload) {
-    return fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    }).then(function (r) {
-      return r.text().then(function (txt) {
-        var data = {};
-        try { data = txt ? JSON.parse(txt) : {}; } catch (e) {}
-        if (!r.ok) throw new Error(data.msg || "请求失败（" + r.status + "）");
-        return data;
-      });
+  function requestCode(phone) {
+    return api("POST", "/api/auth/send", { phone: phone }).then(function (r) {
+      if (!r.ok) return { ok: false, msg: r.msg || "验证码发送失败" };
+      if (r.demoCode) return { ok: true, code: r.demoCode, exp: 5 * 60 * 1000 };
+      return { ok: true, real: true, exp: Math.round((Number(r.expire) || 300) / 60) };
     });
   }
 
-  function requestCode(phone) {
-    if (SMS_MODE === "api") {
-      return postJSON(SMS.sendUrl || "/api/sms/send", { phone: phone })
-        .then(function (data) {
-          if (data && data.ok === false) return { ok: false, msg: data.msg || "验证码发送失败" };
-          return { ok: true, real: true, exp: Number(data.expire) || 300 };
-        })
-        .catch(function (err) {
-          return { ok: false, msg: err.message || "网络异常，请稍后再试" };
-        });
-    }
-    return Promise.resolve(requestCodeDemo(phone));
+  function verifyCode(phone, code, remember) {
+    if (!RE_CODE.test(code)) return Promise.resolve({ ok: false, msg: "请输入 6 位数字验证码" });
+    return api("POST", "/api/auth/session", { phone: phone, code: code, remember: remember !== false }).then(function (r) {
+      if (!r.ok) return { ok: false, msg: r.msg || "验证码不正确", locked: r.error === "locked" };
+      lastUser = toLocalUser(r.user);
+      lastUser.isNew = !!r.isNew;
+      return { ok: true, user: lastUser, isNew: !!r.isNew };
+    });
   }
 
-  function requestCodeDemo(phone) {
-    var o = store.get(K.otp, {});
-    var rec = o[phone];
-    if (rec && Date.now() - rec.sentAt < RESEND) {
-      return { ok: false, msg: "请求过于频繁，请 " + Math.ceil((RESEND - (Date.now() - rec.sentAt)) / 1000) + " 秒后再试" };
-    }
-    var code = String(Math.floor(100000 + Math.random() * 900000));
-    o[phone] = { code: code, sentAt: Date.now(), exp: Date.now() + OTP_TTL };
-    store.set(K.otp, o);
-    return { ok: true, code: code, exp: OTP_TTL };
-  }
-
-  function verifyCode(phone, code) {
-    if (SMS_MODE === "api") {
-      return postJSON(SMS.verifyUrl || "/api/sms/verify", { phone: phone, code: code })
-        .then(function (data) {
-          if (data && data.ok === false) return { ok: false, msg: data.msg || "验证码不正确" };
-          var o = store.get(K.otp, {});
-          delete o[phone];
-          store.set(K.otp, o);
-          return { ok: true };
-        })
-        .catch(function (err) {
-          return { ok: false, msg: err.message || "网络异常，请稍后再试" };
-        });
-    }
-    return Promise.resolve(verifyCodeDemo(phone, code));
-  }
-
-  function verifyCodeDemo(phone, code) {
-    var left = lockLeft(phone);
-    if (left > 0) {
-      return { ok: false, msg: "尝试次数过多，请 " + Math.ceil(left / 1000) + " 秒后再试", locked: true };
-    }
-    var o = store.get(K.otp, {});
-    var rec = o[phone];
-    if (!rec) return { ok: false, msg: "请先获取验证码" };
-    if (Date.now() > rec.exp) {
-      delete o[phone];
-      store.set(K.otp, o);
-      return { ok: false, msg: "验证码已过期，请重新获取" };
-    }
-    if (!RE_CODE.test(code)) return { ok: false, msg: "请输入 6 位数字验证码" };
-    if (code !== rec.code) {
-      var g = getGuard(phone);
-      var fails = (g.code || 0) + 1;
-      if (fails >= 5) {
-        setGuard(phone, { code: 0, lockUntil: Date.now() + 60 * 1000 });
-        return { ok: false, msg: "连续 5 次输入错误，已锁定 60 秒", locked: true };
-      }
-      setGuard(phone, { code: fails });
-      return { ok: false, msg: "验证码不正确，还可尝试 " + (5 - fails) + " 次" };
-    }
-    delete o[phone];
-    store.set(K.otp, o);
-    setGuard(phone, { code: 0 });
-    return { ok: true };
-  }
-
-  /* ---------------- password login ---------------- */
   function loginWithPassword(phone, pw, remember) {
-    var left = lockLeft(phone);
-    if (left > 0) {
-      return { ok: false, msg: "账号已临时锁定，请 " + Math.ceil(left / 1000) + " 秒后再试", locked: true };
-    }
-    var user = findUser(phone);
-    if (!user || !user.pw) {
-      return { ok: false, msg: "该手机号尚未设置密码，请先用验证码登录" };
-    }
-    if (hash(pw) !== user.pw) {
-      var g = getGuard(phone);
-      var fails = (g.pw || 0) + 1;
-      if (fails >= 5) {
-        setGuard(phone, { pw: 0, lockUntil: Date.now() + 5 * 60 * 1000 });
-        return { ok: false, msg: "连续 5 次密码错误，账号锁定 5 分钟", locked: true };
+    return api("POST", "/api/auth/password", { phone: phone, password: pw, remember: remember !== false }).then(function (r) {
+      if (!r.ok) return { ok: false, msg: r.msg || "登录失败", locked: r.error === "locked" };
+      lastUser = toLocalUser(r.user);
+      return { ok: true, user: lastUser };
+    });
+  }
+
+  /* 启动时用服务端会话校准本地缓存 */
+  function syncSession() {
+    return api("GET", "/api/auth/session").then(function (r) {
+      var cached = getSession();
+      if (r.ok && r.user) {
+        var u = toLocalUser(r.user);
+        if (!cached || cached.phone !== u.phone || cached.nickname !== u.nickname || cached.tone !== u.tone || cached.userId !== u.userId) {
+          signIn(u, cached ? cached.remember : true);
+        }
+        return getSession();
       }
-      setGuard(phone, { pw: fails });
-      return { ok: false, msg: "密码不正确，还可尝试 " + (5 - fails) + " 次" };
-    }
-    setGuard(phone, { pw: 0 });
-    return { ok: true, user: user };
+      if (r.status === 401 && cached) {
+        store.del(K.session);
+        emit(null);
+      }
+      return r.status === 401 ? null : cached;
+    });
   }
 
   /* ---------------- toast ---------------- */
@@ -534,7 +512,7 @@
         el.className = "avatar avatar--sm" + (TONES[session.tone] ? " " + TONES[session.tone] : "");
       });
       Array.prototype.forEach.call(document.querySelectorAll("[data-my-home]"), function (el) {
-        el.setAttribute("href", "profile.html?u=" + session.phone);
+        el.setAttribute("href", "profile.html");
       });
     }
     document.documentElement.classList.toggle("is-authed", !!session);
@@ -656,7 +634,6 @@
         setStatus(el, "info", r.real
           ? "验证码已发送至 +86 " + maskPhone(v.value) + "，" + (r.exp || 5) + " 分钟内有效"
           : "验证码已发送至 +86 " + maskPhone(v.value) + "，演示码：" + r.code);
-        if (!r.real) store.set("ywai.lastOtp", r.code);
         startCountdown(btn, 60, "重新获取");
         var first = el.querySelector(".otp__box");
         if (first) first.focus();
@@ -701,14 +678,9 @@
           clearOtp(el);
           return;
         }
-        var user = findUser(v.value);
-        if (!user) {
-          user = upsertUser(v.value, {
-            nickname: "义乌新朋友" + v.value.slice(-4),
-            tone: toneFor(v.value)
-          });
-        }
-        signIn(user, false);
+        var user = r.user;
+        if (r.isNew) user = upsertUser(v.value, { nickname: user.nickname, tone: user.tone });
+        signIn(user, true);
         setStatus(el, "ok", "登录成功，欢迎回来，" + user.nickname);
         setTimeout(function () {
           closeModal(el);
@@ -747,6 +719,7 @@
   /* ---------------- init ---------------- */
   function init() {
     paintChrome(getSession());
+    syncSession();
     bindUserMenu();
     onChange(paintChrome);
 
@@ -794,6 +767,9 @@
     verifyCode: verifyCode,
     smsMode: SMS_MODE,
     loginWithPassword: loginWithPassword,
+    saveMe: saveMe,
+    syncSession: syncSession,
+    api: api,
     lockLeft: lockLeft,
     requireAuth: requireAuth,
     openGate: openGate,
