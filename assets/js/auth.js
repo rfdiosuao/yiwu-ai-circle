@@ -293,16 +293,23 @@
   }
 
   /* ---------------- toast ---------------- */
-  function toast(msg, ms) {
+  /* 提示条的播报区域在页面加载时就存在（空的），之后只往里加内容，读屏软件才会稳定播报 */
+  function toastStack() {
     var stack = document.querySelector(".toast-stack");
     if (!stack) {
       stack = document.createElement("div");
       stack.className = "toast-stack";
+      stack.setAttribute("role", "status");
+      stack.setAttribute("aria-live", "polite");
       document.body.appendChild(stack);
     }
+    return stack;
+  }
+
+  function toast(msg, ms) {
+    var stack = toastStack();
     var el = document.createElement("div");
     el.className = "toast";
-    el.setAttribute("role", "status");
     el.textContent = msg;
     stack.appendChild(el);
     setTimeout(function () {
@@ -322,6 +329,14 @@
     el.classList.add("is-open");
     el.setAttribute("aria-hidden", "false");
     openModalEl = el;
+    /* 弹层打开时，背后的页面不可聚焦、不可点 */
+    if (el.parentElement === document.body) {
+      Array.prototype.forEach.call(document.body.children, function (c) {
+        if (c === el || c.classList.contains("toast-stack") || c.hasAttribute("inert") || c.tagName === "SCRIPT") return;
+        c.setAttribute("inert", "");
+        c.setAttribute("data-yw-inert", "");
+      });
+    }
     document.body.style.overflow = "hidden";
     var focusable = el.querySelector("[data-autofocus]") ||
       el.querySelector(".otp__box, input:not([type='hidden']), select, textarea");
@@ -333,6 +348,10 @@
     if (!target) return;
     target.classList.remove("is-open");
     target.setAttribute("aria-hidden", "true");
+    Array.prototype.forEach.call(document.querySelectorAll("[data-yw-inert]"), function (c) {
+      c.removeAttribute("inert");
+      c.removeAttribute("data-yw-inert");
+    });
     if (openModalEl === target) openModalEl = null;
     document.body.style.overflow = "";
     if (lastFocus && lastFocus.focus) lastFocus.focus();
@@ -718,6 +737,7 @@
 
   /* ---------------- init ---------------- */
   function init() {
+    toastStack();
     paintChrome(getSession());
     syncSession();
     bindUserMenu();

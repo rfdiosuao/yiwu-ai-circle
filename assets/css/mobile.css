@@ -56,7 +56,7 @@ html { -webkit-tap-highlight-color: transparent; }
     place-items: center;
     align-content: center;
     gap: 2px;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.2;
     color: var(--ink-55);
     transition: color 0.2s;
@@ -169,8 +169,8 @@ html { -webkit-tap-highlight-color: transparent; }
   .outposts::-webkit-scrollbar { display: none; }
   .pulse > *,
   .outposts > * { scroll-snap-align: center; }
-  .pulse-card:hover,
-  .outpost:hover { transform: none; }
+  @media (hover: hover) { .pulse-card:hover,
+.outpost:hover { transform: none; } }
   .outpost__sign { min-height: 0; padding: 18px; }
   .outpost__sign .cn { font-size: 40px; }
 
@@ -229,7 +229,7 @@ html { -webkit-tap-highlight-color: transparent; }
     height: 48px;
     padding: 0 20px;
     border-radius: 999px;
-    background: linear-gradient(180deg, #d4452a, var(--red));
+    background: var(--red) linear-gradient(180deg, #c93d23, var(--red));
     color: #fff;
     font-weight: 600;
     font-size: 15px;
@@ -249,8 +249,8 @@ html { -webkit-tap-highlight-color: transparent; }
   .good__big { font-size: 54px; }
   .good__body { padding: 14px 16px 16px; }
   .good__specs { margin: 10px 0; }
-  .good:hover,
-  .merchant:hover { transform: none; }
+  @media (hover: hover) { .good:hover,
+.merchant:hover { transform: none; } }
 
   .merchant-grid { gap: 12px; }
   .merchant { padding: 18px 16px; }
