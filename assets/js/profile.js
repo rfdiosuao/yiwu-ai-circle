@@ -683,6 +683,8 @@
         return;
       }
       isOwner = !!r.isOwner;
+      var myTab = document.querySelector('.tabbar [data-tab="profile"]');
+      if (myTab && !isOwner) myTab.removeAttribute("aria-current");
       session = A.getSession();
       serverPosts = r.posts || [];
       serverLikes = r.likes || 0;

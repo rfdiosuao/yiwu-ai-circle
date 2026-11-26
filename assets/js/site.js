@@ -743,6 +743,22 @@
     });
   }
 
+  /* ---------------- 手机端「发帖」悬浮按钮 ---------------- */
+  document.addEventListener("click", function (e) {
+    var fab = e.target.closest("[data-fab-compose]");
+    if (!fab) return;
+    var box = document.querySelector("[data-composer]");
+    if (!box) return;
+    e.preventDefault();
+    if (!A.getSession()) {
+      A.openGate("发帖需要先登录，义乌AI圈用手机号即可入场。");
+      return;
+    }
+    box.scrollIntoView({ behavior: "smooth", block: "center" });
+    var t = box.querySelector("[data-composer-text]");
+    if (t) setTimeout(function () { t.focus(); }, 380);
+  });
+
   /* ======================================================================
      misc
      ====================================================================== */

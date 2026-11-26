@@ -1,0 +1,279 @@
+/* ==========================================================================
+   义乌AI圈 · 手机端适配
+   最后加载。思路与将来的小程序 / App 保持一致：
+   顶部只留品牌与登录，主导航放到底部标签栏；列表横向滑动；弹层从底部升起。
+   ========================================================================== */
+
+html { -webkit-tap-highlight-color: transparent; }
+
+/* 底部标签栏与发帖按钮：桌面端不显示 */
+.tabbar,
+.fab { display: none; }
+
+@media (max-width: 760px) {
+  :root { --gut: 16px; --hdr: 56px; }
+
+  body.has-tabbar { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+
+  /* iOS 输入框字号小于 16px 会在聚焦时自动放大页面 */
+  input:not([type="checkbox"]):not([type="radio"]):not(.otp__box),
+  select,
+  textarea,
+  .sortsel select,
+  .composer__select,
+  .composer textarea,
+  .cmt-form input,
+  .searchbox input,
+  .phone-field input { font-size: 16px; }
+
+  /* ---------- 顶栏 ---------- */
+  .ticker { height: 28px; }
+  .ticker__item { padding: 0 16px; }
+  .masthead .nav { display: none; }
+  .masthead__inner { height: var(--hdr); justify-content: space-between; }
+  .head-actions { margin-left: auto; }
+  .head-actions .btn--sm { height: 36px; padding: 0 14px; }
+  .brand__logo { height: 32px; }
+
+  /* ---------- 底部标签栏 ---------- */
+  .tabbar {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 90;
+    height: calc(58px + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: saturate(1.4) blur(16px);
+    -webkit-backdrop-filter: saturate(1.4) blur(16px);
+    border-top: 1px solid var(--line);
+  }
+  .tabbar__item {
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 2px;
+    font-size: 11px;
+    line-height: 1.2;
+    color: var(--ink-55);
+    transition: color 0.2s;
+  }
+  .tabbar__item svg { width: 23px; height: 23px; }
+  .tabbar__item:active { color: var(--ink); }
+  .tabbar__item[aria-current="page"] { color: var(--red); font-weight: 600; }
+
+  /* ---------- 通用区块 ---------- */
+  .sec { padding: 44px 0; }
+  .sec-head { margin-bottom: 20px; gap: 12px; }
+  .sec-head__idx { margin-bottom: 10px; }
+  .sec-title { font-size: 26px; line-height: 1.25; }
+  .sec-sub { font-size: 14px; margin-top: 8px; }
+  .sec-foot-note { display: none; }
+
+  .page-head { padding: 26px 0 22px; }
+  .page-head h1 { font-size: 34px; }
+  .page-head__sub { font-size: 14px; }
+  .page-head__stats { gap: 18px; flex-wrap: wrap; margin-top: 14px; }
+  .page-head__bg { font-size: 140px; opacity: 0.22; }
+
+  /* ---------- 触控尺寸 ---------- */
+  .btn--sm { height: 40px; }
+  .chip { height: 36px; padding: 0 14px; }
+  .link-arrow { padding: 9px 14px; }
+  .act { padding: 8px 12px; }
+  .topic { min-height: 36px; }
+
+  /* 横向滑动条：筛选 chips、板块等 */
+  .filterbar__chips,
+  .rail__list {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    margin-right: calc(-1 * var(--gut));
+    padding-right: var(--gut);
+  }
+  .filterbar__chips::-webkit-scrollbar,
+  .rail__list::-webkit-scrollbar { display: none; }
+  .filterbar__chips > * ,
+  .rail__list > * { flex: 0 0 auto; }
+
+  /* ---------- 弹层：从底部升起 ---------- */
+  .modal { align-items: flex-end; padding: 0; }
+  .modal__sheet {
+    width: 100%;
+    max-height: 90vh;
+    border-radius: 20px 20px 0 0;
+    border-bottom: 0;
+    padding: 28px 20px calc(22px + env(safe-area-inset-bottom));
+    animation: sheetUp 0.3s var(--ease);
+  }
+  .modal__sheet::before {
+    content: "";
+    display: block;
+    width: 38px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--ink-20);
+    margin: -14px auto 16px;
+  }
+  .modal__close { width: 36px; height: 36px; top: 12px; right: 12px; }
+
+  .toast-stack { bottom: calc(84px + env(safe-area-inset-bottom)); }
+
+  /* ---------- 页脚 ---------- */
+  .site-foot { padding-top: 40px; }
+  .foot__top { grid-template-columns: 1fr 1fr; gap: 26px 18px; }
+  .foot__brand { grid-column: 1 / -1; }
+  .foot__col:last-child { display: none; }
+  .foot__mark { display: none; }
+  .foot__bar { flex-direction: column; align-items: flex-start; gap: 8px; }
+
+  /* ================= 首页 ================= */
+  .hero { padding-top: 22px; }
+  .hero__grid { gap: 26px; padding-bottom: 28px; }
+  .hero__lead br { display: none; }
+  .hero__lead { margin-top: 16px; }
+  .hero__cta { display: flex; gap: 10px; margin-top: 22px; }
+  .hero__cta .btn { flex: 1 1 0; height: 48px; padding: 0 12px; }
+  .hero__stats { margin-top: 24px; }
+  .hero__visual { aspect-ratio: 1 / 0.9; }
+  .stall-card__code { display: none; }
+
+  .gate { padding: 20px; }
+  .gate__top { margin-bottom: 12px; }
+  .gate h3 { font-size: 24px; }
+  .gate p { display: none; }
+  .gate__foot { margin-top: 10px; padding-top: 12px; }
+
+  /* 动态、线下据点：横向滑动卡片 */
+  .pulse,
+  .outposts {
+    display: grid;
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 84%;
+    gap: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    margin: 0 calc(-1 * var(--gut));
+    padding: 4px var(--gut) 14px;
+  }
+  .pulse::-webkit-scrollbar,
+  .outposts::-webkit-scrollbar { display: none; }
+  .pulse > *,
+  .outposts > * { scroll-snap-align: center; }
+  .pulse-card:hover,
+  .outpost:hover { transform: none; }
+  .outpost__sign { min-height: 0; padding: 18px; }
+  .outpost__sign .cn { font-size: 40px; }
+
+  .smini { padding: 16px 18px; }
+  .dir-row {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    row-gap: 4px;
+    column-gap: 12px;
+    padding: 14px 16px;
+  }
+  .dir-row__stall { grid-column: 1; grid-row: 1; display: flex; gap: 8px; align-items: baseline; font-size: 12px; }
+  .dir-row__stall span { display: inline; }
+  .dir-row__name { grid-column: 1; grid-row: 2; }
+  .dir-row__tags { grid-column: 1; grid-row: 3; }
+  .dir-row__go { grid-column: 2; grid-row: 1 / span 3; align-self: center; }
+  .dir-row__loc { display: none; }
+  .band { padding: 40px 0; }
+  .band__q { font-size: 28px; }
+
+  /* ================= 社区 ================= */
+  .board { padding-top: 16px; gap: 16px; }
+  .board > *,
+  .rail,
+  .rail__box { min-width: 0; }
+  .rail { display: block; position: static; }
+  .rail__box { background: transparent; border: 0; box-shadow: none; padding: 0; }
+  .rail__box + .rail__box { display: none; }
+  .rail__title { display: none; }
+  .rail__item {
+    height: 36px;
+    padding: 0 14px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: var(--card);
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .rail__item.is-on { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .rail__n { display: none; }
+
+  .composer__bar { flex-wrap: wrap; gap: 10px; }
+  .post { padding: 18px 16px 12px; }
+  .post__title { font-size: 17px; }
+  .post__foot { gap: 4px; flex-wrap: wrap; }
+  .feed-head { margin-bottom: 4px; }
+
+  .fab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    position: fixed;
+    right: 16px;
+    bottom: calc(74px + env(safe-area-inset-bottom));
+    z-index: 85;
+    height: 48px;
+    padding: 0 20px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #d4452a, var(--red));
+    color: #fff;
+    font-weight: 600;
+    font-size: 15px;
+    box-shadow: 0 12px 28px -10px rgba(200, 56, 30, 0.75);
+  }
+  .fab svg { width: 18px; height: 18px; }
+
+  /* ================= AI 工具 / 商家 ================= */
+  .filterbar { padding: 12px 0 10px; }
+  .filterbar__row { gap: 10px; flex-wrap: wrap; }
+  .filterbar__label { display: none; }
+  .filterbar__chips { flex: 1 1 100%; }
+  .searchbox { flex: 1 1 100%; }
+
+  .goods { gap: 12px; padding-top: 16px; }
+  .good__media { aspect-ratio: auto; height: 96px; }
+  .good__big { font-size: 54px; }
+  .good__body { padding: 14px 16px 16px; }
+  .good__specs { margin: 10px 0; }
+  .good:hover,
+  .merchant:hover { transform: none; }
+
+  .merchant-grid { gap: 12px; }
+  .merchant { padding: 18px 16px; }
+
+  /* ================= 登录 ================= */
+  .auth__aside { min-height: 0; padding: 18px 18px 16px; }
+  .auth__aside-body { margin-top: 18px; }
+  .auth__kicker,
+  .auth__figures,
+  .auth__seal { display: none; }
+  .auth__display { font-size: 28px; }
+  .auth__panel { padding: 8px 18px 32px; }
+
+  /* ================= 商家认证 / 主页 / 法务 ================= */
+  .cert-steps { overflow-x: auto; scrollbar-width: none; }
+  .legal__toc { position: static; }
+}
+
+@keyframes sheetUp {
+  from { transform: translateY(48px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+@media (max-width: 760px) and (prefers-reduced-motion: reduce) {
+  .modal__sheet { animation: none; }
+}
