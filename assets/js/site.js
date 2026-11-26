@@ -70,6 +70,121 @@
   }
 
   /* ======================================================================
+     SITE DATA（运营后台配置的商家、AI 工具与站点开关）
+     ====================================================================== */
+  var sitePromise = A.api("GET", "/api/site").then(function (r) { return r && r.ok ? r : null; });
+
+  var PLATFORM_KEY = { "全平台": "all", "TikTok Shop": "tiktok", "亚马逊": "amazon", "独立站": "indie", "1688": "1688" };
+  var BILLING_LABEL = { monthly: "Monthly · 按月", yearly: "Yearly · 按年", "per-unit": "Per unit · 按次", free: "Free · 免费" };
+  var LEVEL_LABEL = { diamond: "钻石商家", gold: "金牌商家", normal: "认证商家" };
+
+  function dictLabel(list, v) {
+    var hit = (list || []).filter(function (x) { return x.v === v; })[0];
+    return hit ? hit.t : v;
+  }
+
+  function priceText(p, short) {
+    if (p.price === null || p.price === undefined) return "登录可见";
+    if (!p.price) return "免费";
+    return "¥" + p.price + (short ? "" : " <u>/ " + escapeHTML(p.unit || "") + "</u>");
+  }
+
+  function goodCard(p, i, site) {
+    var plat = PLATFORM_KEY[p.platform] || "all";
+    return '<article class="good" data-cat="' + escapeHTML(p.cat) + '" data-platform="' + plat + '" data-price="' + (Number(p.price) || 0) +
+      '" data-order="' + i + '" data-name="' + escapeHTML((p.name + " " + (p.desc || "") + " " + (p.vendor || "")).toLowerCase()) + '">' +
+      '<div class="good__media good__media--type"><span class="good__no">' + escapeHTML(p.id) + "</span>" +
+      '<span class="good__big">' + String(i + 1).padStart(2, "0") + "</span>" +
+      '<span class="good__glyph">' + escapeHTML((p.name || "工").slice(0, 1)) + "</span>" +
+      (p.badge ? '<span class="good__flag">' + escapeHTML(p.badge) + "</span>" : "") + "</div>" +
+      '<div class="good__body"><div class="good__cat"><span>' + escapeHTML(dictLabel(site.dicts.cats, p.cat)) + "</span><span>" + escapeHTML(p.platform || "") + "</span></div>" +
+      "<h3>" + escapeHTML(p.name) + "</h3>" +
+      '<p class="good__desc">' + escapeHTML(p.desc || "") + "</p>" +
+      '<div class="good__specs">' +
+      '<div class="good__spec"><span>交付</span><b>' + escapeHTML(p.delivery || "—") + "</b></div>" +
+      '<div class="good__spec"><span>语言</span><b>' + escapeHTML(p.langs || "—") + "</b></div>" +
+      '<div class="good__spec"><span>试用</span><b>' + (p.trial ? p.trial + " 天" : "—") + "</b></div></div>" +
+      '<div class="good__foot"><div class="price"><small>' + escapeHTML(BILLING_LABEL[p.billing] || "") + "</small><b>" + priceText(p) + "</b></div>" +
+      '<button class="btn btn--sm btn--red" type="button" data-apply="' + escapeHTML(p.name) + '">' + (p.billing === "free" ? "申请内测" : "申请对接") + "</button></div>" +
+      (p.vendor ? '<div class="good__vendor" style="margin-top:10px">' + escapeHTML(p.vendor) + " · 已认证商家</div>" : "") +
+      "</div></article>";
+  }
+
+  function merchantCard(m, site) {
+    return '<article class="merchant" data-zone="' + escapeHTML(m.zone) + '" data-id="' + escapeHTML(m.id) + '">' +
+      '<div class="merchant__stall"><span class="mono">铺位号</span><b>' + escapeHTML(m.stall || "—") + "</b><span>" +
+      escapeHTML(dictLabel(site.dicts.zones, m.zone)) + "</span></div>" +
+      '<div class="merchant__main"><h3>' + escapeHTML(m.name) + (m.verified ? ' <span class="verified">已认证</span>' : "") + "</h3>" +
+      '<p class="merchant__desc">' + escapeHTML(m.intro || "") + "</p>" +
+      '<div class="merchant__tags">' + (m.tags || []).map(function (t) { return '<span class="tag">' + escapeHTML(t) + "</span>"; }).join("") + "</div>" +
+      '<div class="merchant__stats"><span>起订 <b>' + escapeHTML(m.minOrder || "—") + "</b></span><span>时效 <b>" + escapeHTML(m.leadTime || "—") +
+      "</b></span><span>营业 <b>" + escapeHTML(m.hours || "—") + "</b></span></div></div>" +
+      '<div class="merchant__act"><button class="btn btn--sm btn--ink" type="button" data-contact data-mid="' + escapeHTML(m.id) +
+      '" data-name="' + escapeHTML(m.name) + '" data-zone-name="' + escapeHTML((m.zoneName || "") + " " + (m.stall || "")) + '">查看联系方式</button>' +
+      '<span class="mono" style="color:var(--ink-40)">' + escapeHTML(LEVEL_LABEL[m.level] || "认证商家") + "</span></div></article>";
+  }
+
+  sitePromise.then(function (site) {
+    if (!site) return;
+    var st = site.settings || {};
+    var t = st.toggles || {};
+
+    document.documentElement.classList.toggle("no-comment", t.comment === false);
+    if (t.merchantApply === false) {
+      Array.prototype.forEach.call(document.querySelectorAll('[data-join], a[href^="certify.html"]'), function (el) {
+        var li = el.closest("li");
+        (li || el).hidden = true;
+      });
+    }
+    if (st.siteName && st.siteName !== "义乌AI圈") document.title = document.title.replace("义乌AI圈", st.siteName);
+
+    /* 自定义滚动公告：插在两段循环内容的末尾，保证无缝滚动 */
+    var track = document.querySelector(".ticker__track");
+    if (track && st.ticker && st.ticker.length) {
+      var items = track.querySelectorAll(".ticker__item");
+      var half = Math.floor(items.length / 2);
+      var extra = st.ticker.map(function (x) {
+        return '<span class="ticker__item"><i class="dot"></i>' + escapeHTML(x) + "</span>";
+      }).join("");
+      if (items[half]) items[half].insertAdjacentHTML("beforebegin", extra);
+      track.insertAdjacentHTML("beforeend", extra);
+    }
+
+    Array.prototype.forEach.call(document.querySelectorAll('[data-stat="products"]'), function (el) {
+      el.textContent = site.products.length;
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-stat="cats"]'), function (el) {
+      var seen = {};
+      site.products.forEach(function (p) { seen[p.cat] = 1; });
+      el.textContent = Object.keys(seen).length;
+    });
+
+    /* 首页：商家名录与 AI 工具预览 */
+    var homeDir = document.querySelector("[data-home-merchants]");
+    if (homeDir && site.merchants.length) {
+      homeDir.innerHTML = site.merchants.slice(0, 5).map(function (m) {
+        return '<a class="dir-row" href="merchants.html"><div class="dir-row__stall">' + escapeHTML(m.stall || "—") +
+          "<span>" + escapeHTML(dictLabel(site.dicts.zones, m.zone)) + "</span></div>" +
+          '<div class="dir-row__name">' + escapeHTML(m.name) + (m.verified ? ' <span class="verified">认证</span>' : "") + "</div>" +
+          '<div class="dir-row__tags">' + (m.tags || []).slice(0, 3).map(function (x) { return '<span class="tag">' + escapeHTML(x) + "</span>"; }).join("") + "</div>" +
+          '<div class="dir-row__loc">' + escapeHTML(m.zoneName || "") + "</div>" +
+          '<div class="dir-row__loc">' + escapeHTML(m.leadTime || "") + "</div>" +
+          '<span class="dir-row__go">→</span></a>';
+      }).join("");
+    }
+    var homeShelf = document.querySelector("[data-home-products]");
+    if (homeShelf && site.products.length) {
+      homeShelf.innerHTML = site.products.slice(0, 4).map(function (p) {
+        return '<a class="smini" href="products.html"><div class="smini__body"><div class="smini__cat">' +
+          escapeHTML(dictLabel(site.dicts.cats, p.cat)) + " · " + escapeHTML(p.id) + "</div>" +
+          "<h4>" + escapeHTML(p.name) + "</h4><p>" + escapeHTML(p.desc || "") + "</p></div>" +
+          '<div class="smini__price"><b>' + priceText(p, true) + "</b><span>" +
+          (p.price ? "每" + escapeHTML(p.unit || "") : p.price === 0 ? "内测" : "") + "</span></div></a>";
+      }).join("");
+    }
+  });
+
+  /* ======================================================================
      POSTS
      ====================================================================== */
   var feed = document.querySelector("[data-feed]");
@@ -428,7 +543,7 @@
   var goodsGrid = document.querySelector("[data-goods]");
 
   if (goodsGrid) {
-    var goods = Array.prototype.slice.call(goodsGrid.querySelectorAll(".good"));
+    var goods = [];
     var state = { cat: "all", platform: "all", q: "" };
 
     function applyGoods() {
@@ -492,6 +607,27 @@
         U.toast("已把「" + name + "」的对接申请发给商家");
       });
     });
+
+    sitePromise.then(function (site) {
+      var loading = goodsGrid.querySelector("[data-list-loading]");
+      if (!site) {
+        if (loading) loading.textContent = "AI 工具暂时加载失败，请刷新重试。";
+        return;
+      }
+      if (loading) loading.remove();
+      var empty = goodsGrid.querySelector("[data-goods-empty]");
+      var html = site.products.map(function (p, i) { return goodCard(p, i, site); }).join("");
+      if (empty) empty.insertAdjacentHTML("beforebegin", html);
+      else goodsGrid.insertAdjacentHTML("beforeend", html);
+      goods = Array.prototype.slice.call(goodsGrid.querySelectorAll(".good"));
+      Array.prototype.forEach.call(document.querySelectorAll('[data-filter="cat"]'), function (b) {
+        var n = b.dataset.val === "all" ? site.products.length
+          : site.products.filter(function (p) { return p.cat === b.dataset.val; }).length;
+        var c = b.querySelector(".chip__n");
+        if (c) c.textContent = n;
+      });
+      applyGoods();
+    });
   }
 
   /* ======================================================================
@@ -500,7 +636,30 @@
   var merchantGrid = document.querySelector("[data-merchants]");
 
   if (merchantGrid) {
-    var cards = Array.prototype.slice.call(merchantGrid.querySelectorAll(".merchant"));
+    var cards = [];
+
+    sitePromise.then(function (site) {
+      var loading = merchantGrid.querySelector("[data-list-loading]");
+      if (!site) {
+        if (loading) loading.textContent = "商家名录暂时加载失败，请刷新重试。";
+        return;
+      }
+      if (loading) loading.remove();
+      var empty = merchantGrid.querySelector("[data-merchant-empty]");
+      var html = site.merchants.map(function (m) { return merchantCard(m, site); }).join("");
+      if (empty) empty.insertAdjacentHTML("beforebegin", html);
+      else merchantGrid.insertAdjacentHTML("beforeend", html);
+      cards = Array.prototype.slice.call(merchantGrid.querySelectorAll(".merchant"));
+      Array.prototype.forEach.call(document.querySelectorAll("[data-zone-filter]"), function (b) {
+        var z = b.dataset.zoneFilter;
+        var n = z === "all" ? cards.length : cards.filter(function (c) { return c.dataset.zone === z; }).length;
+        var c = b.querySelector(".chip__n");
+        if (c) c.textContent = n;
+      });
+      var counter = document.querySelector("[data-merchant-count]");
+      if (counter) counter.textContent = String(cards.length);
+      if (empty) empty.hidden = cards.length > 0;
+    });
 
     Array.prototype.forEach.call(document.querySelectorAll("[data-zone-filter]"), function (btn) {
       btn.addEventListener("click", function () {
@@ -534,7 +693,7 @@
         '<div class="gate-head"><span class="mono">Stall contact · 档口联系</span>' +
         '<h3 id="contactTitle">联系方式</h3><p data-contact-sub></p></div>' +
         '<div class="contact-card" data-contact-body></div>' +
-        '<div class="gate-foot"><span>SAMPLE DATA · 演示数据</span><a href="merchants.html">浏览更多商家 →</a></div>' +
+        '<div class="gate-foot"><span>联系时请说明来自义乌AI圈</span><a href="merchants.html">浏览更多商家 →</a></div>' +
         "</div>";
       document.body.appendChild(contactModal);
     }
@@ -545,18 +704,30 @@
       var name = btn.dataset.name;
       var zone = btn.dataset.zoneName || "";
       A.requireAuth("查看商家联系方式需要先登录，避免被批量采集。", function (session) {
+        btn.disabled = true;
+        A.api("GET", "/api/merchants/" + encodeURIComponent(btn.dataset.mid || "") + "/contact").then(function (r) {
+          btn.disabled = false;
+          if (!r.ok) {
+            U.toast(r.msg || "联系方式暂时获取失败，请稍后再试");
+            return;
+          }
+          showContact(session, r.contact || {});
+        });
+      });
+
+      function showContact(session, ct) {
         var body = contactModal.querySelector("[data-contact-body]");
         var sub = contactModal.querySelector("[data-contact-sub]");
         sub.textContent = name + (zone ? " · " + zone : "") + "　（已登录：" + session.nickname + "）";
         body.innerHTML =
-          '<div class="contact-row"><span>联系人</span><b>' + escapeHTML(btn.dataset.person || "档口负责人") + "</b></div>" +
-          '<div class="contact-row"><span>手机 / 微信同号</span><b>' + escapeHTML(btn.dataset.phone) + "</b></div>" +
-          '<div class="contact-row"><span>微信</span><b>' + escapeHTML(btn.dataset.wechat) + "</b></div>" +
-          '<div class="contact-row"><span>营业时间</span><b>' + escapeHTML(btn.dataset.hours || "08:30 - 17:30") + "</b></div>" +
+          '<div class="contact-row"><span>联系人</span><b>' + escapeHTML(ct.owner || "档口负责人") + "</b></div>" +
+          '<div class="contact-row"><span>手机</span><b>' + escapeHTML(ct.phone || "—") + "</b></div>" +
+          '<div class="contact-row"><span>微信</span><b>' + escapeHTML(ct.wechat || "—") + "</b></div>" +
+          '<div class="contact-row"><span>营业时间</span><b>' + escapeHTML(ct.hours || "—") + "</b></div>" +
           '<button class="btn btn--red btn--block" type="button" data-copy>' +
           '<span>复制微信号</span></button>';
         body.querySelector("[data-copy]").addEventListener("click", function () {
-          var v = btn.dataset.wechat;
+          var v = ct.wechat || ct.phone || "";
           if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(v).then(function () {
               U.toast("微信号已复制：" + v);
@@ -568,7 +739,7 @@
           }
         });
         U.openModal(contactModal);
-      });
+      }
     });
   }
 
@@ -631,7 +802,7 @@
   function liveCounts() {
     return {
       posts: BASE_POSTS_TODAY + (serverStats ? serverStats.postsToday || 0 : 0),
-      merchants: Math.max(BASE_MERCHANTS, serverStats && serverStats.merchants ? serverStats.merchants : 0)
+      merchants: serverStats && typeof serverStats.merchants === "number" ? serverStats.merchants : BASE_MERCHANTS
     };
   }
 

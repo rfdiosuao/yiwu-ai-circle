@@ -263,7 +263,7 @@
         { id: "posts", label: "社区帖子", i: "07", badge: "posts" }
       ]
     },
-    { group: "系统", items: [{ id: "settings", label: "站点设置", i: "08" }] }
+    { group: "系统", items: [{ id: "settings", label: "站点设置", i: "08" }, { id: "audit", label: "操作日志", i: "09" }] }
   ];
 
   var TITLES = {
@@ -274,7 +274,8 @@
     products: "AI 工具",
     articles: "资讯与政策",
     posts: "社区帖子",
-    settings: "站点设置"
+    settings: "站点设置",
+    audit: "操作日志"
   };
 
   function renderNav() {
@@ -424,7 +425,7 @@
     html: function () {
       return '<div class="ahead">' +
         '<div><div class="ahead__kicker"><b>02</b><span>用户与订阅</span></div>' +
-        "<h1>用户</h1><p class=\"ahead__sub\">改方案、改到期、冻结账号，都在这里。点击任意一行编辑。</p></div>" +
+        "<h1>用户</h1><p class=\"ahead__sub\">这里是前台真实注册的用户。改方案、改到期、冻结账号都会立即生效：冻结后对方会被登出，无法再登录、发帖和评论。</p></div>" +
         '<div class="ahead__actions"><button class="btn btn--sm btn--red" type="button" data-act="user:new">新增用户</button></div></div>' +
 
         '<div class="panel"><div class="filters">' +
@@ -466,14 +467,15 @@
         "<td>" + userPill(u.status) + "</td>" +
         '<td class="num" style="' + expCls + '">' + esc(expTxt) + "</td>" +
         '<td class="num">' + money(u.spend) + "</td>" +
-        '<td class="num muted">' + u.posts + "</td>" +
+        '<td class="num muted">' + (u.posts || 0) + "</td>" +
         '<td><div class="tbl__acts">' +
         '<button class="row-btn" type="button" data-act="user:renew" data-id="' + u.id + '">+30 天</button>' +
         '<button class="row-btn" type="button" data-act="user:open" data-id="' + u.id + '">编辑</button>' +
         '<button class="row-btn ' + (u.status === "frozen" ? "" : "row-btn--red") + '" type="button" data-act="user:freeze" data-id="' + u.id + '">' +
         (u.status === "frozen" ? "解冻" : "冻结") + "</button>" +
         "</div></td></tr>";
-    }).join("") : '<tr class="is-static"><td colspan="7"><div class="aempty"><strong>没有匹配的用户</strong>换个关键词，或者新增一个。</div></td></tr>';
+    }).join("") : '<tr class="is-static"><td colspan="7"><div class="aempty"><strong>' + (db.users.length ? "没有匹配的用户" : "还没有人注册") + "</strong>" +
+      (db.users.length ? "换个关键词，或者新增一个。" : "前台有人用手机号注册后，会自动出现在这里。") + "</div></td></tr>";
 
     $("#uCount").textContent = rows.length;
   };
@@ -490,14 +492,14 @@
       sub: isNew ? "手动建号，适合线下转化的客户。" : u.phone + " · 注册于 " + u.joined,
       body: '<form id="drawerForm" class="dgrid">' +
         field("昵称", '<input class="input" name="name" value="' + esc(u.name) + '" required maxlength="16" placeholder="怎么称呼">', "full") +
-        field("手机号", '<input class="input" name="phone" value="' + esc(u.phone) + '" maxlength="11" inputmode="numeric" placeholder="11 位手机号">') +
+        field("手机号", '<input class="input" name="phone" value="' + esc(u.phone) + '" maxlength="11" inputmode="numeric" placeholder="11 位手机号"' + (isNew ? "" : " readonly") + ">", "", isNew ? "对方用这个手机号收验证码登录" : "手机号是登录凭证，不能在后台修改") +
         field("订阅方案", '<select name="plan">' + opts([{ v: "free", t: "体验版" }, { v: "pro", t: "经营者" }, { v: "studio", t: "老板娘" }], u.plan) + "</select>") +
         field("账号状态", '<select name="status">' + opts([{ v: "active", t: "正常" }, { v: "expired", t: "已过期" }, { v: "frozen", t: "已冻结" }], u.status) + "</select>") +
         field("到期日", '<input class="input" type="date" name="expire" value="' + esc(u.expire) + '">') +
         field("累计消费", '<input class="input" type="number" name="spend" min="0" step="1" value="' + u.spend + '">') +
-        field("发帖数", '<input class="input" type="number" name="posts" min="0" step="1" value="' + u.posts + '">') +
+        field("发帖数", '<input class="input" value="' + (u.posts || 0) + '" readonly>', "", "按真实帖子统计") +
         field("备注", '<textarea name="note" placeholder="内部备注，只有后台可见">' + esc(u.note) + "</textarea>", "full") +
-        '<p class="dhint full">到期日留空表示不限；状态为「已过期」时前台会提示续费。</p>' +
+        '<p class="dhint full">到期日留空表示不限；冻结后对方立即被登出，且无法再次登录。</p>' +
         "</form>",
       foot: (isNew ? "" : '<button class="row-btn row-btn--red" type="button" data-act="user:delete" data-id="' + u.id + '">删除</button>' +
         '<a class="row-btn" href="profile.html?u=' + encodeURIComponent(u.phone) + '" target="_blank" rel="noopener">查看主页</a>') +
@@ -507,23 +509,22 @@
       save: function (d) {
         var target = isNew ? null : DB.userOf(u.id);
         if (!target) {
+          if (!/^1[3-9]\d{9}$/.test(d.phone.trim())) { toast("请输入有效的 11 位手机号"); return; }
           var nu = {
-            id: DB.nextId("U", db.users),
+            id: DB.nextId("NEW", db.users),
             name: d.name.trim(), phone: d.phone.trim(), plan: d.plan, status: d.status,
             joined: DB.addDays("", 0), expire: d.expire || "",
-            spend: Number(d.spend) || 0, posts: Number(d.posts) || 0,
+            spend: Number(d.spend) || 0, posts: 0,
             tone: (db.users.length % 3) + 1, note: d.note
           };
           db.users.unshift(nu);
           toast("已新增用户 " + nu.name);
         } else {
           target.name = d.name.trim();
-          target.phone = d.phone.trim();
           target.plan = d.plan;
           target.status = d.status;
           target.expire = d.expire || "";
           target.spend = Number(d.spend) || 0;
-          target.posts = Number(d.posts) || 0;
           target.note = d.note;
           toast("已保存 " + target.name);
         }
@@ -544,7 +545,7 @@
     openModal({
       kicker: "危险操作",
       title: "删除「" + name + "」？",
-      sub: sub || "删除后无法恢复；演示环境可在设置里恢复数据。",
+      sub: sub || "删除后无法恢复，操作会记录在操作日志里。",
       body: '<p class="dhint">真实环境建议先隐藏或冻结，保留经营记录。</p>',
       foot: '<button class="btn btn--sm btn--ghost" type="button" data-close-modal>取消</button>' +
         '<button class="btn btn--sm btn--red" type="button" data-act="delete:confirm">确认删除</button>'
@@ -651,6 +652,7 @@
   }
 
   function openGrant() {
+    if (!db.users.length) { toast("还没有注册用户，可以先在「用户」里新增"); return; }
     var userOpts = db.users.map(function (u) {
       return { v: u.id, t: u.name + " · " + u.phone + "（" + DB.planOf(u.plan).name + "）" };
     });
@@ -830,7 +832,7 @@
         (isSel("merchants", m.id) ? " checked" : "") + ' aria-label="选择 ' + esc(m.name) + '"></td>' +
         '<td class="num strong">' + esc(m.stall) +
         '<div class="muted" style="font-size:9px;letter-spacing:.08em">' + esc(m.id) + "</div></td>" +
-        '<td class="strong">' + esc(m.name) + " " + levelTag(m.level) +
+        '<td class="strong">' + esc(m.name) + " " + (m.live ? '<span class="pill pill--red" title="前台用户提交的认证申请">认证申请</span>' : levelTag(m.level)) +
         '<div class="muted" style="font-size:10.5px;font-weight:400">' + esc(m.owner) + "</div></td>" +
         '<td class="muted">' + esc(m.zoneName) + "</td>" +
         '<td><div style="display:flex;gap:4px;flex-wrap:wrap">' +
@@ -1309,15 +1311,16 @@
     html: function () {
       return '<div class="ahead">' +
         '<div><div class="ahead__kicker"><b>07</b><span>社区帖子</span></div>' +
-        "<h1>社区帖子</h1><p class=\"ahead__sub\">处理举报、隐藏刷屏内容。隐藏后前台立即不可见，但数据保留。</p></div></div>" +
+        "<h1>社区帖子</h1><p class=\"ahead__sub\">圈友在前台发的真实帖子。隐藏后前台立即不可见，数据保留，可随时恢复；删除会连同点赞和评论一起清除。</p></div>" +
+        '<div class="ahead__actions"><a class="btn btn--sm btn--ghost" href="posts.html" target="_blank" rel="noopener">打开社区</a></div></div>' +
 
         '<div class="panel"><div class="filters">' +
         '<label class="adm-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg>' +
         '<input type="search" placeholder="搜索标题或作者" data-f="q" value="' + esc(state.f.posts.q) + '"></label>' +
-        chipGroup("posts", "status", [["all", "全部"], ["normal", "正常"], ["reported", "被举报"], ["hidden", "已隐藏"]]) +
+        chipGroup("posts", "status", [["all", "全部"], ["normal", "正常"], ["hidden", "已隐藏"]]) +
         '<span class="filters__count">共 <b id="poCount">0</b> 条</span></div>' +
         '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
-        "<th>帖子</th><th>作者</th><th>板块</th><th>赞 / 评</th><th>举报</th><th>状态</th><th>日期</th><th style=\"text-align:right\">操作</th>" +
+        "<th>帖子</th><th>作者</th><th>板块</th><th>赞 / 评</th><th>状态</th><th>日期</th><th style=\"text-align:right\">操作</th>" +
         '</tr></thead><tbody id="poBody"></tbody></table></div></div>';
     }
   };
@@ -1333,11 +1336,11 @@
     $("#poBody").innerHTML = rows.length ? rows.map(function (p) {
       var hot = p.status === "reported";
       return '<tr class="is-static' + (hot ? "" : "") + '"' + (hot ? ' style="background:rgba(196,53,28,.045)"' : "") + ">" +
-        '<td class="strong" style="white-space:normal;max-width:360px">' + esc(p.title) + "</td>" +
+        '<td class="strong" style="white-space:normal;max-width:360px">' + esc(p.title) +
+        (p.body ? '<div class="muted" style="font-weight:400;font-size:12px;margin-top:2px">' + esc(String(p.body).slice(0, 60)) + (String(p.body).length > 60 ? "…" : "") + "</div>" : "") + "</td>" +
         '<td class="muted">' + esc(p.author) + "</td>" +
         '<td><span class="tag" style="height:19px;font-size:9px">' + esc(p.tag) + "</span></td>" +
         '<td class="num muted">' + p.likes + " / " + p.comments + "</td>" +
-        '<td class="num" style="' + (p.reports ? "color:var(--red)" : "") + '">' + (p.reports || "—") + "</td>" +
         "<td>" + (p.status === "reported"
           ? '<span class="pill pill--red">被举报 ' + p.reports + "</span>"
           : p.status === "hidden"
@@ -1350,14 +1353,68 @@
           : '<button class="row-btn" type="button" data-act="post:hide" data-id="' + p.id + '">隐藏</button>') +
         '<button class="row-btn row-btn--red" type="button" data-act="post:delete" data-id="' + p.id + '">删除</button>' +
         "</div></td></tr>";
-    }).join("") : '<tr class="is-static"><td colspan="8"><div class="aempty"><strong>没有匹配的帖子</strong>换个状态看看。</div></td></tr>';
+    }).join("") : '<tr class="is-static"><td colspan="7"><div class="aempty"><strong>' + (db.posts.length ? "没有匹配的帖子" : "社区里还没有圈友发帖") + "</strong>" +
+      (db.posts.length ? "换个状态看看。" : "圈友在前台发帖后会出现在这里。") + "</div></td></tr>";
 
     $("#poCount").textContent = rows.length;
   };
 
   /* ======================================================================
+     AUDIT LOG
+     ====================================================================== */
+  VIEWS.audit = {
+    html: function () {
+      return '<div class="ahead">' +
+        '<div><div class="ahead__kicker"><b>09</b><span>安全</span></div>' +
+        "<h1>操作日志</h1><p class=\"ahead__sub\">谁在什么时候改了什么：登录、改账号、保存数据、处理用户与帖子、审核认证，都会记录在这里（保留最近 500 条）。</p></div></div>" +
+        '<div class="panel"><div class="tbl-wrap"><table class="tbl"><thead><tr>' +
+        "<th>时间</th><th>操作人</th><th>操作</th><th>内容</th><th>IP</th>" +
+        '</tr></thead><tbody id="auBody"><tr class="is-static"><td colspan="5"><div class="aempty">加载中…</div></td></tr></tbody></table></div></div>';
+    }
+  };
+
+  PAINT.audit = function () {
+    DB.auditLog().then(function (r) {
+      var body = document.getElementById("auBody");
+      if (!body) return;
+      var items = (r && r.items) || [];
+      body.innerHTML = items.length ? items.map(function (it) {
+        var d = new Date(it.at);
+        var ts = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0") +
+          " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+        var bad = /失败|删除|冻结/.test(it.action);
+        return '<tr class="is-static"><td class="num muted" style="white-space:nowrap">' + ts + "</td>" +
+          '<td class="strong">' + esc(it.user) + "</td>" +
+          "<td>" + '<span class="pill ' + (bad ? "pill--red" : "pill--mute") + '">' + esc(it.action) + "</span></td>" +
+          '<td style="white-space:normal;max-width:520px">' + esc(it.detail || "—") + "</td>" +
+          '<td class="num muted">' + esc(it.ip || "") + "</td></tr>";
+      }).join("") : '<tr class="is-static"><td colspan="5"><div class="aempty"><strong>还没有记录</strong>后台的操作会出现在这里。</div></td></tr>';
+    });
+  };
+
+  /* ======================================================================
      SETTINGS
      ====================================================================== */
+  function accountPanel() {
+    var acc = DB.account || { user: "admin", name: "管理员", source: "default" };
+    if (acc.source === "env") {
+      return '<div class="crow-note"><p class="dhint">当前账号 <b>' + esc(acc.user) + "</b> 由服务器环境变量 ADMIN_USER / ADMIN_PASS 管理，" +
+        "需要在服务器上修改后重启服务。</p></div>";
+    }
+    return '<form id="accountForm" class="dgrid" autocomplete="off">' +
+      (acc.source === "default"
+        ? '<p class="dhint full" style="color:var(--red);font-weight:600">正在使用默认账号 admin / ywai2026，任何人都可能猜到，请立即设置新密码。</p>'
+        : "") +
+      field("登录账号", '<input class="input" name="user" value="' + esc(acc.user) + '" autocomplete="username">') +
+      field("显示名称", '<input class="input" name="name" value="' + esc(acc.name) + '">') +
+      field("当前密码", '<input class="input" type="password" name="current" autocomplete="current-password" required>', "full") +
+      field("新密码", '<input class="input" type="password" name="pass" autocomplete="new-password" placeholder="' +
+        (acc.source === "default" ? "必须设置" : "留空则不修改") + '">', "full", "至少 10 位，同时包含字母和数字") +
+      '<div class="full" style="display:flex;justify-content:flex-end;gap:8px;align-items:center">' +
+      '<span class="dhint" style="margin-right:auto">保存后其他设备上的后台登录会全部失效。</span>' +
+      '<button class="btn btn--sm btn--red" type="submit">更新账号</button></div></form>';
+  }
+
   VIEWS.settings = {
     html: function () {
       var s = db.settings;
@@ -1383,7 +1440,7 @@
         field("站点名称", '<input class="input" name="siteName" value="' + esc(s.siteName) + '">') +
         field("一句话标语", '<input class="input" name="tagline" value="' + esc(s.tagline) + '">') +
         field("站点描述", '<textarea name="description" style="min-height:70px">' + esc(s.description) + "</textarea>", "full") +
-        field("行情滚动条（每行一条）", '<textarea name="ticker" style="min-height:120px">' + esc(s.ticker.join("\n")) + "</textarea>", "full") +
+        field("顶部滚动公告（每行一条，附加在实时汇率、舱位之后）", '<textarea name="ticker" style="min-height:120px">' + esc(s.ticker.join("\n")) + "</textarea>", "full") +
         "</div></div></div>" +
 
         '<div class="panel"><div class="panel__head"><div class="panel__title">交易与收款</div>' +
@@ -1401,32 +1458,31 @@
         '<div class="panel"><div class="panel__head"><div class="panel__title">功能开关</div>' +
         '<span class="mono" style="color:var(--ink-40)">功能开关</span></div>' +
         '<div class="panel__body" style="padding-top:4px;padding-bottom:6px">' +
-        toggleRow("register", "开放注册", "关闭后只能由后台手动建号") +
-        toggleRow("inviteOnly", "仅邀请码注册", "开启后注册需要填写邀请码") +
-        toggleRow("comment", "允许评论", "关闭后前台帖子只可点赞与收藏") +
-        toggleRow("showPrice", "前台展示价格", "关闭后产品价格显示为「登录可见」") +
-        toggleRow("merchantApply", "接受商家入驻申请", "关闭后隐藏「申请入驻」入口") +
-        toggleRow("maintenance", "维护模式", "开启后前台展示维护页，仅管理员可访问") +
+        toggleRow("register", "开放注册", "关闭后新手机号无法注册，老用户照常登录；可在「用户」里手动建号") +
+        toggleRow("comment", "允许评论", "关闭后前台隐藏评论入口，接口也会拒绝新评论") +
+        toggleRow("showPrice", "前台展示价格", "关闭后未登录访客看到的价格显示为「登录可见」") +
+        toggleRow("merchantApply", "接受商家入驻申请", "关闭后隐藏前台「申请入驻」入口，认证接口也会拒绝提交") +
+        toggleRow("maintenance", "维护模式", "开启后前台所有页面显示维护页；已登录后台的管理员仍可正常浏览") +
         "</div></div>" +
 
-        '<div class="panel"><div class="panel__head"><div class="panel__title">管理员账号</div>' +
-        '<span class="mono" style="color:var(--ink-40)">访问与权限</span></div>' +
-        '<div class="panel__body"><div class="dgrid">' +
-        field("登录账号", '<input class="input" name="adminUser" value="' + esc(s.admin.user) + '">') +
-        field("显示名称", '<input class="input" name="adminName" value="' + esc(s.admin.name) + '">') +
-        field("新密码", '<input class="input" type="password" name="adminPass" placeholder="留空则不修改" autocomplete="new-password">', "full") +
-        '</div><p class="dhint" style="margin-top:10px">修改后下次登录生效。演示默认：admin / ywai2026</p></div></div>' +
+        "</div></div></form>" +
 
+        '<div class="set-grid" style="margin-top:16px"><div class="set-col">' +
+        '<div class="panel" id="accountPanel"><div class="panel__head"><div class="panel__title">管理员账号</div>' +
+        '<span class="mono" style="color:var(--ink-40)">访问与权限</span></div>' +
+        '<div class="panel__body">' + accountPanel() + "</div></div>" +
+        "</div><div class=\"set-col\">" +
         '<div class="panel"><div class="panel__head"><div class="panel__title">数据</div>' +
         '<span class="mono" style="color:var(--ink-40)">数据管理</span></div>' +
         '<div class="panel__body" style="display:grid;gap:10px">' +
         '<button class="btn btn--ghost btn--sm" type="button" data-act="data:export">导出 JSON 备份</button>' +
-        '<button class="btn btn--ghost btn--sm" type="button" data-act="data:reset">恢复演示数据</button>' +
+        '<button class="btn btn--ghost btn--sm" type="button" data-act="data:clear-demo">清空演示订单与统计</button>' +
+        '<button class="btn btn--ghost btn--sm" type="button" data-act="data:reset">恢复初始内容</button>' +
         '<p class="dhint">数据保存在服务器（data/db.json），修改后自动同步。' +
-        (DB.live ? "当前真实注册用户 " + DB.live.users + " 人，社区发帖 " + DB.live.posts + " 条，认证申请 " + DB.live.applications.length + " 份。" : "") + '</p>' +
+        (DB.live ? "当前真实注册用户 " + DB.live.users + " 人，社区发帖 " + DB.live.posts + " 条，待处理认证申请 " + DB.live.applications + " 份。" : "") + "</p>" +
         "</div></div>" +
+        "</div></div>";
 
-        "</div></div></form>";
     }
   };
 
@@ -1537,7 +1593,7 @@
       }
       case "user:delete": {
         var du = DB.userOf(id);
-        confirmDelete("user", id, du.name, "该用户的订阅记录会保留在订单里，但账号会从列表移除。");
+        confirmDelete("user", id, du.name, "账号和个人主页会被删除，对方已发的帖子保留。想暂时限制对方，建议用「冻结」。");
         break;
       }
       case "delete:confirm": {
@@ -1547,6 +1603,7 @@
         if (t.kind === "merchant") db.merchants = db.merchants.filter(function (x) { return x.id !== t.id; });
         if (t.kind === "product") db.products = db.products.filter(function (x) { return x.id !== t.id; });
         if (t.kind === "article") db.articles = db.articles.filter(function (x) { return x.id !== t.id; });
+        if (t.kind === "post") db.posts = db.posts.filter(function (x) { return x.id !== t.id; });
         DB.save();
         closeModal();
         closeDrawer();
@@ -1590,6 +1647,7 @@
         var mr = db.merchants.filter(function (x) { return x.id === id; })[0];
         mr.status = "rejected";
         mr.verified = false;
+        if (!mr.rejectReason) mr.rejectReason = "资料不完整，请补充后重新提交";
         DB.save();
         render();
         toast(mr.name + " 已拒绝");
@@ -1735,10 +1793,8 @@
         break;
       }
       case "post:delete": {
-        db.posts = db.posts.filter(function (x) { return x.id !== id; });
-        DB.save();
-        render();
-        toast("帖子已删除");
+        var pd = db.posts.filter(function (x) { return x.id === id; })[0];
+        confirmDelete("post", id, pd ? pd.title : "这条帖子", "帖子连同点赞、评论一起删除，无法恢复。只想下线的话，用「隐藏」。");
         break;
       }
 
@@ -1751,18 +1807,26 @@
         toast("已导出备份");
         break;
       }
+      case "data:clear-demo": {
+        db.orders = [];
+        db.stats = { revenue: [], signups: [], visits: [] };
+        DB.save();
+        render();
+        toast("已清空演示订单与统计");
+        break;
+      }
       case "data:reset": {
         openModal({
           kicker: "危险操作",
-          title: "恢复演示数据？",
-          sub: "当前所有修改都会被覆盖，回到初始的 20 位用户与 13 笔订单。",
+          title: "恢复初始内容？",
+          sub: "商家、AI 工具、资讯、方案和订单会回到初始内容，你的修改会被覆盖。真实用户、帖子和认证申请不受影响。",
           body: '<p class="dhint">导出备份后再重置会更稳妥。</p>',
           foot: '<button class="btn btn--sm btn--ghost" type="button" data-close-modal>取消</button>' +
             '<button class="btn btn--sm btn--red" type="button" data-act="data:reset-confirm">确认重置</button>'
         });
         break;
       }
-      case "data:reset-confirm": DB.reset().then(function () { location.reload(); }); break;
+      case "data:reset-confirm": DB.reset().then(function () { closeModal(); render(); toast("已恢复初始内容"); }); break;
     }
   });
 
@@ -1772,6 +1836,24 @@
     if (!input) return;
     state.f[state.route][input.dataset.f] = input.value;
     if (PAINT[state.route]) PAINT[state.route]();
+  });
+
+  /* ---------------- account form ---------------- */
+  document.addEventListener("submit", function (e) {
+    if (e.target.id !== "accountForm") return;
+    e.preventDefault();
+    var d = {};
+    new FormData(e.target).forEach(function (v, k) { d[k] = v; });
+    var btn = e.target.querySelector("button[type=submit]");
+    btn.disabled = true;
+    DB.changeAccount({ current: d.current, user: d.user.trim(), name: d.name.trim(), pass: d.pass }).then(function (r) {
+      btn.disabled = false;
+      if (!r.ok) { toast(r.message || "保存失败"); return; }
+      paintWho();
+      paintDefaultWarning();
+      render();
+      toast("账号已更新，其他设备需要重新登录");
+    });
   });
 
   /* ---------------- settings form ---------------- */
@@ -1793,13 +1875,7 @@
     ["register", "inviteOnly", "comment", "showPrice", "merchantApply", "maintenance"].forEach(function (k) {
       s.toggles[k] = d["t_" + k] === "1";
     });
-    s.admin.user = d.adminUser.trim() || "admin";
-    s.admin.name = d.adminName.trim() || "管理员";
-    if (d.adminPass && d.adminPass.length >= 6) s.admin.pass = d.adminPass;
     DB.save();
-    document.getElementById("sideName").textContent = s.admin.name;
-    var sav = document.getElementById("sideAvatar");
-    if (sav) sav.textContent = (s.admin.name || "管").slice(0, 1);
     toast("设置已保存");
     render();
   });
@@ -1815,14 +1891,45 @@
   var fails = 0;
   var lockUntil = 0;
 
+  function paintWho() {
+    var acc = DB.account || { name: "管理员", user: "admin" };
+    document.getElementById("sideName").textContent = acc.name || "管理员";
+    document.getElementById("sideRole").textContent = "账号 " + acc.user;
+    var av = document.getElementById("sideAvatar");
+    av.textContent = (acc.name || "管").slice(0, 1);
+  }
+
+  function paintDefaultWarning() {
+    var bar = document.getElementById("defaultWarn");
+    var on = DB.account && DB.account.isDefault;
+    if (!on) { if (bar) bar.remove(); return; }
+    if (bar) return;
+    bar = document.createElement("div");
+    bar.id = "defaultWarn";
+    bar.className = "warnbar";
+    bar.innerHTML = "<b>安全提醒</b><span>后台仍在使用默认账号密码，任何人都可能登录。请到「站点设置 → 管理员账号」立即修改。</span>" +
+      '<a href="#/settings">去修改 →</a>';
+    viewEl.parentNode.insertBefore(bar, viewEl);
+  }
+
+  var syncEl = document.getElementById("syncState");
+  var SYNC_TEXT = { pending: "有未保存的修改", saving: "保存中…", saved: "已保存", loaded: "已同步", error: "保存失败", conflict: "已加载最新版本", expired: "登录已过期" };
+  DB.onSync(function (st, detail) {
+    if (syncEl) {
+      syncEl.textContent = SYNC_TEXT[st] || "";
+      syncEl.dataset.state = st;
+    }
+    if (st === "conflict") { render(); toast(detail || "其他管理员刚刚修改过数据，已加载最新版本，请重新操作"); }
+    if (st === "error") toast(detail || "同步到服务器失败，请检查网络");
+    if (st === "expired") { toast("后台登录已过期，请重新登录"); setTimeout(function () { location.reload(); }, 1200); }
+    if (st === "saved" && DB.live) renderNav();
+  });
+
   function showApp() {
     gate.style.display = "none";
     app.hidden = false;
-    var s = db.settings.admin;
-    document.getElementById("sideName").textContent = s.name || "管理员";
-    document.getElementById("sideRole").textContent = "超级管理员";
-    var av = document.getElementById("sideAvatar");
-    av.textContent = (s.name || "管").slice(0, 1);
+    paintWho();
+    paintDefaultWarning();
     if (!location.hash) location.hash = "#/dashboard";
     render();
   }
@@ -1852,7 +1959,7 @@
       if (r.ok) {
         gateErr.classList.remove("is-on");
         showApp();
-        toast("欢迎回来，" + (db.settings.admin.name || "管理员"));
+        toast("欢迎回来，" + ((DB.account && DB.account.name) || "管理员"));
       } else if (r.status === 429 || r.status === 0) {
         gateErr.textContent = r.message || "请稍后再试";
         gateErr.classList.add("is-on");
@@ -1879,9 +1986,7 @@
     DB.logout().then(function () { location.reload(); });
   });
 
-  DB.onSync(function (state) {
-    if (state === "error") toast("同步到服务器失败，请检查网络或重新登录");
-  });
+
 
   /* ---------------- boot ---------------- */
   dateEl.textContent = (function () {
@@ -1899,11 +2004,6 @@
   function showGate() {
     gate.style.display = "grid";
     app.hidden = true;
-    gateUser.value = db.settings.admin.user;
-    var hint = document.querySelector(".agate__hint");
-    if (hint && (db.settings.admin.user !== "admin" || db.settings.admin.pass !== "ywai2026")) {
-      hint.style.display = "none";
-    }
     setTimeout(function () { gateUser.focus(); }, 300);
   }
 })();

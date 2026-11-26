@@ -352,3 +352,10 @@ body {
   .nav a { padding: 6px 6px; font-size: 13px; }
   .nav { gap: 0; }
 }
+
+/* 后台关闭评论时 */
+.no-comment [data-act="comment"],
+.no-comment .post__comments { display: none !important; }
+
+/* 列表加载占位 */
+[data-list-loading] { color: var(--ink-55); text-align: center; padding: 48px 0; }
