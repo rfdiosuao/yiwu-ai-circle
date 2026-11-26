@@ -6,8 +6,8 @@
 <title>运营后台 · 义乌AI圈</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/png" href="assets/img/logo-icon.png?v=2">
-<link rel="stylesheet" href="assets/css/styles.css?v=3">
-<link rel="stylesheet" href="assets/css/admin.css?v=3">
+<link rel="stylesheet" href="assets/css/styles.css?v=4">
+<link rel="stylesheet" href="assets/css/admin.css?v=4">
 </head>
 <body>
 
@@ -22,7 +22,7 @@
     <form id="gateForm" novalidate>
       <div class="dfield">
         <label for="gateUser">管理员账号</label>
-        <input class="input" id="gateUser" name="user" value="admin" autocomplete="username" placeholder="账号">
+        <input class="input" id="gateUser" name="user" autocomplete="username" placeholder="账号">
       </div>
       <div class="dfield">
         <label for="gatePass">密码</label>
@@ -32,7 +32,6 @@
       <button class="btn btn--red btn--block" type="submit" id="gateBtn">进入后台</button>
     </form>
 
-    <div class="agate__hint">Demo · 账号 <b>admin</b> · 密码 <b>ywai2026</b></div>
     <a class="agate__back" href="index.html">← 回到前台</a>
   </div>
 </div>
@@ -61,7 +60,7 @@
     <header class="topbar">
       <div class="topbar__crumbs"><span>义乌AI圈</span><span>/</span><b id="crumb">总览</b></div>
       <div class="topbar__right">
-        <span class="topbar__dot">系统正常</span>
+        <span class="topbar__sync" id="syncState" data-state="loaded" aria-live="polite">已同步</span>
         <span id="today">2026 · 11 · 16</span>
       </div>
     </header>
@@ -99,7 +98,7 @@
   </div>
 </div>
 
-<script src="assets/js/admin-data.js?v=3"></script>
-<script src="assets/js/admin.js?v=3"></script>
+<script src="assets/js/admin-data.js?v=4"></script>
+<script src="assets/js/admin.js?v=4"></script>
 </body>
 </html>

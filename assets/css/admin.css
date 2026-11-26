@@ -1227,3 +1227,44 @@
   .filters { padding: 10px 12px; }
   .panel__body { padding: 14px; }
 }
+
+/* ---------- 保存状态 ---------- */
+.topbar__sync {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--ink-55);
+}
+.topbar__sync::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 0 3px rgba(31, 107, 58, 0.14);
+}
+.topbar__sync[data-state="pending"]::before,
+.topbar__sync[data-state="saving"]::before { background: var(--gold); box-shadow: 0 0 0 3px rgba(168, 128, 44, 0.16); }
+.topbar__sync[data-state="error"],
+.topbar__sync[data-state="expired"] { color: var(--red); }
+.topbar__sync[data-state="error"]::before,
+.topbar__sync[data-state="expired"]::before { background: var(--red); box-shadow: 0 0 0 3px rgba(196, 53, 28, 0.14); }
+
+/* ---------- 默认密码警告 ---------- */
+.warnbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 16px 28px 0;
+  padding: 12px 16px;
+  border: 1px solid rgba(196, 53, 28, 0.35);
+  border-radius: 10px;
+  background: rgba(196, 53, 28, 0.06);
+  color: var(--ink);
+  font-size: 13px;
+}
+.warnbar b { color: var(--red); }
+.warnbar a { margin-left: auto; color: var(--red); font-weight: 600; }
+@media (max-width: 760px) { .warnbar { margin: 12px 16px 0; } }

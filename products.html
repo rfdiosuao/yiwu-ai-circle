@@ -6,10 +6,10 @@
 <title>AI 工具 · 义乌AI圈</title>
 <meta name="description" content="按义乌产业场景封装的 AI 工具、服务、模板与货盘。直接对接，直接能用。">
 <link rel="icon" type="image/png" href="assets/img/logo-icon.png?v=2">
-<link rel="stylesheet" href="assets/css/styles.css?v=3">
-<link rel="stylesheet" href="assets/css/pages.css?v=3">
-<link rel="stylesheet" href="assets/css/auth.css?v=3">
-<link rel="stylesheet" href="assets/css/refresh.css?v=3">
+<link rel="stylesheet" href="assets/css/styles.css?v=4">
+<link rel="stylesheet" href="assets/css/pages.css?v=4">
+<link rel="stylesheet" href="assets/css/auth.css?v=4">
+<link rel="stylesheet" href="assets/css/refresh.css?v=4">
 </head>
 <body data-page="products">
 
@@ -55,8 +55,8 @@
       <p class="page-head__sub">不是通用大模型。每一个工具都对着义乌的一个具体动作：上架、出图、开播、报价、估价。</p>
     </div>
     <div class="page-head__stats">
-      <div class="pstat"><b>12</b><span>个工具在架</span></div>
-      <div class="pstat"><b>4</b><span>个品类</span></div>
+      <div class="pstat"><b data-stat="products">—</b><span>个工具在架</span></div>
+      <div class="pstat"><b data-stat="cats">—</b><span>个品类</span></div>
       <div class="pstat"><b>326</b><span>本周对接</span></div>
       <button class="btn btn--ghost btn--sm" type="button" data-join>我要上架 <span class="arrow">→</span></button>
     </div>
@@ -104,239 +104,7 @@
 <div class="wrap">
   <div class="goods" data-goods>
 
-    <article class="good" data-cat="tool" data-platform="all" data-price="399" data-order="1" data-name="选品雷达 pro 爆品 监控 热榜">
-      <div class="good__media good__media--type">
-        <span class="good__no">AI-001</span>
-        <span class="good__big">01</span>
-        <span class="good__glyph">选</span>
-        <span class="good__flag">热门</span>
-      </div>
-      <div class="good__body">
-        <div class="good__cat"><span>Selection · 工具</span><span>全平台</span></div>
-        <h3>选品雷达 Pro</h3>
-        <p class="good__desc">实时监控 TikTok、亚马逊与 1688 热榜，按义乌品类给出爆品信号、竞争强度与建议售价。</p>
-        <div class="good__specs">
-          <div class="good__spec"><span>交付</span><b>网页端 · 实时</b></div>
-          <div class="good__spec"><span>起订</span><b>1 席位</b></div>
-          <div class="good__spec"><span>覆盖</span><b>18 个品类</b></div>
-        </div>
-        <div class="good__foot">
-          <div class="price"><small>Monthly</small><b>¥399 <u>/ 月</u></b></div>
-          <button class="btn btn--sm btn--red" type="button" data-apply="选品雷达 Pro">申请对接</button>
-        </div>
-        <div class="good__vendor" style="margin-top:10px">云枢数据 · 已认证商家</div>
-      </div>
-    </article>
-
-    <article class="good" data-cat="tool" data-platform="tiktok" data-price="0.5" data-order="2" data-name="listing 多语种 标题 关键词 上架">
-      <div class="good__media good__media--type">
-        <span class="good__no">AI-002</span>
-        <span class="good__big">02</span>
-        <span class="good__glyph">译</span>
-        <span class="good__flag">按条计费</span>
-      </div>
-      <div class="good__body">
-        <div class="good__cat"><span>Listing · 工具</span><span>TikTok Shop</span></div>
-        <h3>多语种 Listing 工厂</h3>
-        <p class="good__desc">输入义乌货号，一次输出 12 种语言的标题、五点描述与关键词，自带平台长度与敏感词校验。</p>
-        <div class="good__specs">
-          <div class="good__spec"><span>交付</span><b>API / 网页</b></div>
-          <div class="good__spec"><span>语言</span><b>12 种</b></div>
-          <div class="good__spec"><span>单价</span><b>¥0.5 / 条</b></div>
-        </div>
-        <div class="good__foot">
-          <div class="price"><small>Per listing</small><b>¥0.5 <u>/ 条</u></b></div>
-          <button class="btn btn--sm btn--red" type="button" data-apply="多语种 Listing 工厂">申请对接</button>
-        </div>
-        <div class="good__vendor" style="margin-top:10px">字舟科技 · 已认证商家</div>
-      </div>
-    </article>
-
-    <article class="good" data-cat="tool" data-platform="amazon" data-price="1.2" data-order="3" data-name="商品图 白底图 场景图 模特图 重制">
-      <div class="good__media good__media--type">
-        <span class="good__no">AI-003</span>
-        <span class="good__big">03</span>
-        <span class="good__glyph">图</span>
-      </div>
-      <div class="good__body">
-        <div class="good__cat"><span>Visual · 工具</span><span>亚马逊</span></div>
-        <h3>商品图重制</h3>
-        <p class="good__desc">白底图、场景图、模特图，30 秒出图。内置中东与欧美两套审美预设，支持批量换背景。</p>
-        <div class="good__specs">
-          <div class="good__spec"><span>交付</span><b>网页 / 插件</b></div>
-          <div class="good__spec"><span>尺寸</span><b>平台预设</b></div>
-          <div class="good__spec"><span>单价</span><b>¥1.2 / 张</b></div>
-        </div>
-        <div class="good__foot">
-          <div class="price"><small>Per image</small><b>¥1.2 <u>/ 张</u></b></div>
-          <button class="btn btn--sm btn--red" type="button" data-apply="商品图重制">申请对接</button>
-        </div>
-        <div class="good__vendor" style="margin-top:10px">方格视觉 · 已认证商家</div>
-      </div>
-    </article>
-
-    <article class="good" data-cat="tool" data-platform="tiktok" data-price="299" data-order="4" data-name="数字人 口播 视频 短视频 直播">
-      <div class="good__media good__media--type">
-        <span class="good__no">AI-004</span>
-        <span class="good__big">04</span>
-        <span class="good__glyph">播</span>
-        <span class="good__flag">日更利器</span>
-      </div>
-      <div class="good__body">
-        <div class="good__cat"><span>内容 · 工具</span><span>TikTok Shop</span></div>
-        <h3>数字人口播工厂</h3>
-        <p class="good__desc">12 种语言口播视频，绑定当日热点脚本。一个人也能日更 30 条，夜班时段不用熬。</p>
-        <div class="good__specs">
-          <div class="good__spec"><span>交付</span><b>网页端</b></div>
-          <div class="good__spec"><span>时长</span><b>60s 以内</b></div>
-          <div class="good__spec"><span>音色</span><b>24 种</b></div>
-        </div>
-        <div class="good__foot">
-          <div class="price"><small>Monthly</small><b>¥299 <u>/ 月</u></b></div>
-          <button class="btn btn--sm btn--red" type="button" data-apply="数字人口播工厂">申请对接</button>
-        </div>
-        <div class="good__vendor" style="margin-top:10px">青口内容实验室 · 已认证商家</div>
-      </div>
-    </article>
-
-    <article class="good" data-cat="tool" data-platform="indie" data-price="199" data-order="5" data-name="询盘 翻译 whatsapp 邮件 报价">
-      <div class="good__media good__media--type">
-        <span class="good__no">AI-005</span>
-        <span class="good__big">05</span>
-        <span class="good__glyph">阿</span>
-      </div>
-      <div class="good__body">
-        <div class="good__cat"><span>询盘 · 工具</span><span>独立站</span></div>
-        <h3>询盘翻译官</h3>
-        <p class="good__desc">WhatsApp 与邮件询盘实时翻译，自动生成带利润率的报价模板，避免汇率算错。</p>
-        <div class="good__specs">
-          <div class="good__spec"><span>交付</span><b>浏览器插件</b></div>
-          <div class="good__spec"><span>语种</span><b>9 种</b></div>
-          <div class="good__spec"><span>报价</span><b>含利润测算</b></div>
-        </div>
-        <div class="good__foot">
-          <div class="price"><small>Monthly</small><b>¥199 <u>/ 月</u></b></div>
-          <button class="btn btn--sm btn--red" type="button" data-apply="询盘翻译官">申请对接</button>
-        </div>
-        <div class="good__vendor" style="margin-top:10px">译站网络 · 已认证商家</div>
-      </div>
-    </article>
-
-    <article class="good" data-cat="tool" data-platform="1688" data-price="0" data-order="6" data-name="尾货 估价 收购价 清仓">
-      <div class="good__media good__media--type">
-        <span class="good__no">AI-006</span>
-        <span class="good__big">06</span>
-        <span class="good__glyph">尾</span>
-      </div>
-      <div class="good__body">
-        <div class="good__cat"><span>Pricing · 工具</span><span>1688</span></div>
-        <h3>尾货估价</h3>
-        <p class="good__desc">基于历史成交数据估算合理收购价，附同品类近期成交区间，收尾货前先跑一遍。</p>
-        <div class="good__specs">
-          <div class="good__spec"><span>交付</span><b>小程序</b></div>
-          <div class="good__spec"><span>样本</span><b>12 万条成交</b></div>
-          <div class="good__spec"><span>状态</span><b>内测中</b></div>
-        </div>
-        <div class="good__foot">
-          <div class="price"><small>Beta</small><b>免费 <u>内测</u></b></div>
-          <button class="btn btn--sm btn--ghost" type="button" data-apply="尾货估价">申请内测</button>
-        </div>
-        <div class="good__vendor" style="margin-top:10px">北下朱数据组 · 圈内共建</div>
-      </div>
-    </article>
-
-    <article class="good" data-cat="service" data-platform="amazon" data-price="99" data-order="7" data-name="合规 认证 标签 限售 自查">
-      <div class="good__media good__media--type">
-        <span class="good__no">SV-001</span>
-        <span class="good__big">07</span>
-        <span class="good__glyph">规</span>
-      </div>
-      <div class="good__body">
-        <div class="good__cat"><span>Compliance · 服务</span><span>亚马逊</span></div>
-        <h3>出口合规查</h3>
-        <p class="good__desc">出口国认证、标签、限售品类自查。沙特 SASO、欧盟 CE、美国 FDA 三套规则库持续更新。</p>
-        <div class="good__specs">
-          <div class="good__spec"><span>交付</span><b>报告 PDF</b></div>
-          <div class="good__spec"><span>时效</span><b>2 小时</b></div>
-          <div class="good__spec"><span>规则库</span><b>3 个市场</b></div>
-        </div>
-        <div class="good__foot">
-          <div class="price"><small>Monthly</small><b>¥99 <u>/ 月</u></b></div>
-          <button class="btn btn--sm btn--red" type="button" data-apply="出口合规查">申请对接</button>
-        </div>
-        <div class="good__vendor" style="margin-top:10px">明关咨询 · 已认证商家</div>
-      </div>
-    </article>
-
-    <article class="good" data-cat="service" data-platform="all" data-price="599" data-order="8" data-name="档口 saas 库存 一件代发 对账">
-      <div class="good__media good__media--type">
-        <span class="good__no">SV-002</span>
-        <span class="good__big">08</span>
-        <span class="good__glyph">账</span>
-      </div>
-      <div class="good__body">
-        <div class="good__cat"><span>Operation · 服务</span><span>全平台</span></div>
-        <h3>档口 SaaS</h3>
-        <p class="good__desc">库存、一件代发、对账单三合一。给档口用的，不是给大公司用的，手机就能开单。</p>
-        <div class="good__specs">
-          <div class="good__spec"><span>交付</span><b>App + 后台</b></div>
-          <div class="good__spec"><span>账号</span><b>5 个子账号</b></div>
-          <div class="good__spec"><span>部署</span><b>当天开通</b></div>
-        </div>
-        <div class="good__foot">
-          <div class="price"><small>Yearly</small><b>¥599 <u>/ 年</u></b></div>
-          <button class="btn btn--sm btn--red" type="button" data-apply="档口 SaaS">申请对接</button>
-        </div>
-        <div class="good__vendor" style="margin-top:10px">档口云 · 已认证商家</div>
-      </div>
-    </article>
-
-    <article class="good" data-cat="template" data-platform="indie" data-price="49" data-order="9" data-name="中东 节日 营销 日历 模板 斋月">
-      <div class="good__media good__media--type">
-        <span class="good__no">TP-001</span>
-        <span class="good__big">09</span>
-        <span class="good__glyph">历</span>
-      </div>
-      <div class="good__body">
-        <div class="good__cat"><span>Template · 模板</span><span>独立站</span></div>
-        <h3>中东节日营销日历</h3>
-        <p class="good__desc">斋月、开斋节、白色星期五的备货节奏与内容排期模板，含阿拉伯语文案骨架。</p>
-        <div class="good__specs">
-          <div class="good__spec"><span>交付</span><b>Notion + 表格</b></div>
-          <div class="good__spec"><span>节点</span><b>全年 9 个</b></div>
-          <div class="good__spec"><span>授权</span><b>单团队</b></div>
-        </div>
-        <div class="good__foot">
-          <div class="price"><small>One-time</small><b>¥49 <u>/ 份</u></b></div>
-          <button class="btn btn--sm btn--red" type="button" data-apply="中东节日营销日历">申请对接</button>
-        </div>
-        <div class="good__vendor" style="margin-top:10px">哈桑工作室 · 圈友出品</div>
-      </div>
-    </article>
-
-    <article class="good" data-cat="stock" data-platform="1688" data-price="1.8" data-order="10" data-name="圣诞 尾货 货盘 毛绒 灯串 批发">
-      <div class="good__media good__media--type">
-        <span class="good__no">ST-001</span>
-        <span class="good__big">10</span>
-        <span class="good__glyph">货</span>
-        <span class="good__flag">尾货</span>
-      </div>
-      <div class="good__body">
-        <div class="good__cat"><span>Stock · 货盘</span><span>1688</span></div>
-        <h3>圣诞尾货货盘</h3>
-        <p class="good__desc">商贸城二区工厂尾单：毛绒挂件 1.8 / 个，灯串 4.2 / 套。500 起拿，可混批，支持一件代发。</p>
-        <div class="good__specs">
-          <div class="good__spec"><span>起订</span><b>500 件</b></div>
-          <div class="good__spec"><span>现货</span><b>约 3,200 件</b></div>
-          <div class="good__spec"><span>发货</span><b>48 小时内</b></div>
-        </div>
-        <div class="good__foot">
-          <div class="price"><small>From</small><b>¥1.8 <u>/ 件</u></b></div>
-          <button class="btn btn--sm btn--red" type="button" data-apply="圣诞尾货货盘">申请对接</button>
-        </div>
-        <div class="good__vendor" style="margin-top:10px">义乌小陈 · 二区档口</div>
-      </div>
-    </article>
+    <div class="empty goods-empty" data-list-loading>正在加载 AI 工具…</div>
 
     <div class="empty goods-empty" data-goods-empty hidden>
       <strong>没有匹配的工具</strong>
@@ -397,8 +165,8 @@
   </div>
 </footer>
 
-<script src="assets/js/config.js?v=3" defer></script>
-<script src="assets/js/auth.js?v=3" defer></script>
-<script src="assets/js/site.js?v=3" defer></script>
+<script src="assets/js/config.js?v=4" defer></script>
+<script src="assets/js/auth.js?v=4" defer></script>
+<script src="assets/js/site.js?v=4" defer></script>
 </body>
 </html>

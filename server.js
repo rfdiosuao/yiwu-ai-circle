@@ -13,6 +13,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const { createStore } = require("./lib/store");
+const adminSeed = require("./lib/admin-seed");
 
 /* ------------------------------------------------------------------ 配置 */
 
@@ -303,7 +304,9 @@ function publicMe(u) {
 function currentUser(req) {
   const data = unsign(parseCookies(req)[COOKIE_NAME], SESSION_TTL_SECONDS);
   if (!data || !data.p || !isValidPhone(data.p)) return null;
-  return ensureUser(data.p).user;
+  const user = db().users[userIdFor(data.p)];
+  if (!user || user.status === "frozen") return null;
+  return user;
 }
 
 function startSession(res, user, remember) {
@@ -450,17 +453,135 @@ function cleanProfile(src, user) {
 
 /* ------------------------------------------------------------- 运营后台 */
 
-function adminCreds() {
-  if (ADMIN_USER && ADMIN_PASS) return { user: ADMIN_USER, pass: ADMIN_PASS, source: "env" };
-  const doc = db().admin;
-  const a = doc && doc.settings && doc.settings.admin;
-  if (a && a.user && a.pass) return { user: String(a.user), pass: String(a.pass), source: "db" };
-  return { user: "admin", pass: "ywai2026", source: "default" };
+const DEFAULT_ADMIN = { user: "admin", pass: "ywai2026" };
+const DOC_LABELS = { plans: "方案", orders: "订单", merchants: "商家", products: "AI 工具", articles: "资讯" };
+
+function day(ts) {
+  const d = new Date(ts || Date.now());
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+
+/* 启动时：没有后台数据就写入初始内容；旧版数据做一次迁移。 */
+function initAdminDoc() {
+  const d = db();
+  if (!d.admin) {
+    d.admin = adminSeed.migrate(adminSeed.seed());
+    d.adminRev = 1;
+  }
+  const doc = adminSeed.migrate(d.admin);
+  doc.settings = doc.settings || {};
+  const legacy = doc.settings.admin || {};
+  /* 旧版把后台口令明文存在 settings.admin.pass：转成哈希后删除明文 */
+  if (legacy.pass && String(legacy.pass) !== DEFAULT_ADMIN.pass) {
+    if (!d.adminAuth) {
+      d.adminAuth = { user: str(legacy.user, 32) || "admin", name: str(legacy.name, 20) || "管理员", pwHash: hashPassword(String(legacy.pass)), ver: 1, updatedAt: Date.now() };
+    }
+  }
+  doc.settings.admin = { name: str(legacy.name, 20) || "管理员" };
+  /* 旧版的演示用户 / 演示帖子不再使用，后台改读真实数据 */
+  doc.users = [];
+  doc.posts = [];
+  if (Array.isArray(doc.settings.ticker) && doc.settings.ticker.some(function (t) { return /今日新帖 46|认证商家 128/.test(t); })) {
+    doc.settings.ticker = [];
+  }
+  if (!d.adminRev) d.adminRev = 1;
+  if (!Array.isArray(d.audit)) d.audit = [];
+  store.save();
+}
+
+function adminAccount() {
+  const a = db().adminAuth;
+  if (ADMIN_USER && ADMIN_PASS) return { user: ADMIN_USER, name: (a && a.name) || "管理员", source: "env", ver: 0 };
+  if (a && a.pwHash) return { user: a.user, name: a.name || "管理员", source: "db", ver: a.ver || 1 };
+  return { user: DEFAULT_ADMIN.user, name: (a && a.name) || "管理员", source: "default", ver: 0 };
+}
+
+function checkAdminLogin(user, pass) {
+  const acc = adminAccount();
+  if (!safeEqual(user, acc.user)) return false;
+  if (acc.source === "env") return safeEqual(pass, ADMIN_PASS);
+  if (acc.source === "db") return checkPassword(pass, db().adminAuth.pwHash);
+  return safeEqual(pass, DEFAULT_ADMIN.pass);
+}
+
+/* 后台会话绑定账号与口令版本：改密码后旧会话全部失效。 */
+function adminSession(req) {
+  const data = unsign(parseCookies(req)[ADMIN_COOKIE], ADMIN_TTL_SECONDS);
+  if (!data || !data.a) return null;
+  const acc = adminAccount();
+  if (data.a !== acc.user || Number(data.v || 0) !== acc.ver) return null;
+  return acc;
 }
 
 function isAdmin(req) {
-  const data = unsign(parseCookies(req)[ADMIN_COOKIE], ADMIN_TTL_SECONDS);
-  return Boolean(data && data.a);
+  return Boolean(adminSession(req));
+}
+
+function publicAccount(acc) {
+  return { user: acc.user, name: acc.name, source: acc.source, isDefault: acc.source === "default" };
+}
+
+function audit(req, action, detail, who) {
+  const acc = who ? null : adminSession(req);
+  db().audit.unshift({
+    at: Date.now(),
+    user: who || (acc ? acc.user : "—"),
+    ip: clientIp(req),
+    action: action,
+    detail: String(detail || "").slice(0, 400)
+  });
+  if (db().audit.length > 500) db().audit.length = 500;
+  store.save();
+}
+
+function nameIn(list, id) {
+  const it = list.find(function (z) { return z && z.id === id; });
+  return (it && (it.name || it.title || it.userName || it.id)) || id;
+}
+
+/* 对比保存前后的后台数据，生成一句人能看懂的变更摘要。 */
+function diffDoc(a, b) {
+  const parts = [];
+  Object.keys(DOC_LABELS).forEach(function (k) {
+    const x = Array.isArray(a && a[k]) ? a[k] : [];
+    const y = Array.isArray(b && b[k]) ? b[k] : [];
+    const mx = new Map(x.map(function (i) { return [i && i.id, JSON.stringify(i)]; }));
+    const my = new Map(y.map(function (i) { return [i && i.id, JSON.stringify(i)]; }));
+    let add = 0, del = 0, mod = 0;
+    const names = [];
+    my.forEach(function (v, id) {
+      if (!mx.has(id)) { add++; names.push(nameIn(y, id)); }
+      else if (mx.get(id) !== v) { mod++; names.push(nameIn(y, id)); }
+    });
+    mx.forEach(function (v, id) {
+      if (!my.has(id)) { del++; names.push(nameIn(x, id)); }
+    });
+    if (add || del || mod) {
+      parts.push(DOC_LABELS[k] + (add ? " 新增 " + add : "") + (mod ? " 修改 " + mod : "") + (del ? " 删除 " + del : "") +
+        "（" + names.slice(0, 3).join("、") + (names.length > 3 ? " 等" : "") + "）");
+    }
+  });
+  const other = { settings: "站点设置", dicts: "字典", stats: "统计数据" };
+  Object.keys(other).forEach(function (k) {
+    if (JSON.stringify(a && a[k]) !== JSON.stringify(b && b[k])) parts.push(other[k]);
+  });
+  return parts.join("；");
+}
+
+/* 保存前清洗：用户与帖子是实时数据，不随整库保存；口令字段一律丢弃。 */
+function cleanDoc(doc, prev) {
+  const out = Object.assign({}, doc);
+  out.users = [];
+  out.posts = [];
+  out.merchants = (Array.isArray(doc.merchants) ? doc.merchants : []).filter(function (m) { return m && !m.live; });
+  out.settings = Object.assign({}, doc.settings || {});
+  out.settings.admin = { name: str(out.settings.admin && out.settings.admin.name, 20) || (prev && prev.settings && prev.settings.admin && prev.settings.admin.name) || "管理员" };
+  return out;
+}
+
+function siteToggles() {
+  const s = db().admin && db().admin.settings;
+  return Object.assign({ register: true, comment: true, showPrice: true, merchantApply: true, maintenance: false }, (s && s.toggles) || {});
 }
 
 function approvedMerchants() {
@@ -468,6 +589,99 @@ function approvedMerchants() {
   if (!doc || !Array.isArray(doc.merchants)) return null;
   return doc.merchants.filter(function (m) { return m && m.status === "approved"; }).length;
 }
+
+function memberStatus(u) {
+  if (u.status === "frozen") return "frozen";
+  if (u.status === "expired") return "expired";
+  if (u.expire && (u.plan || "free") !== "free" && new Date(u.expire + "T23:59:59").getTime() < Date.now()) return "expired";
+  return "active";
+}
+
+function adminMembers() {
+  const d = db();
+  const count = {};
+  d.posts.forEach(function (p) { count[p.uid] = (count[p.uid] || 0) + 1; });
+  return Object.keys(d.users).map(function (k) { return d.users[k]; })
+    .sort(function (a, b) { return b.createdAt - a.createdAt; })
+    .map(function (u) {
+      return {
+        id: u.id, name: u.nickname, phone: u.phone, plan: u.plan || "free", status: memberStatus(u),
+        joined: day(u.createdAt), expire: u.expire || "", spend: u.spend || 0, posts: count[u.id] || 0,
+        tone: u.tone || 1, note: u.note || "", live: true
+      };
+    });
+}
+
+function adminPostList() {
+  const d = db();
+  return d.posts.map(function (p) {
+    const author = d.users[p.uid];
+    const r = d.reactions[p.id];
+    return {
+      id: p.id, author: author ? author.nickname : p.name, authorId: p.uid, tag: p.tag, title: p.title, body: p.body,
+      likes: r ? r.likes.length : 0, comments: (d.comments[p.id] || []).length, reports: 0,
+      status: p.hidden ? "hidden" : "normal", date: day(p.at), live: true
+    };
+  });
+}
+
+const ZONE_KEYS = [["北下朱", "beixiazhu"], ["青口", "qingkou"], ["廿三里", "niansanli"], ["佛堂", "fotang"], ["商贸城", "tradecity"], ["篁园", "tradecity"]];
+function zoneKey(text) {
+  const hit = ZONE_KEYS.find(function (z) { return String(text || "").indexOf(z[0]) >= 0; });
+  return hit ? hit[1] : "tradecity";
+}
+
+function adminApplications() {
+  const d = db();
+  return Object.keys(d.applications).map(function (k) { return d.applications[k]; })
+    .filter(function (a) { return a.status !== "approved"; })
+    .map(function (a) {
+      const u = d.users[a.userId];
+      return {
+        id: "AP-" + a.userId.slice(2, 10), appUid: a.userId, name: a.shopName, stall: a.stallNo,
+        zone: zoneKey(a.zone), zoneName: a.zone, owner: a.contactName, phone: u ? u.phone : "", wechat: a.wechat,
+        tags: [], intro: a.intro || "", level: "normal", minOrder: "1 件", leadTime: "当天", hours: "08:30 - 17:30",
+        license: "", certExpire: "", verified: false, status: a.status === "rejected" ? "rejected" : "pending",
+        rejectReason: a.rejectReason || "", featured: false, weight: 60, views: 0, leads: 0,
+        joined: day(a.submittedAt), updated: day(a.submittedAt), live: true
+      };
+    });
+}
+
+function liveData() {
+  return { members: adminMembers(), posts: adminPostList(), applications: adminApplications() };
+}
+
+function cleanMerchant(src, base) {
+  const m = Object.assign({}, base || {}, src || {});
+  const tags = Array.isArray(m.tags) ? m.tags : String(m.tags || "").split(/[、,，\s]+/);
+  return {
+    id: base && base.id, name: str(m.name, 40), stall: str(m.stall, 24), zone: str(m.zone, 20) || "tradecity",
+    zoneName: str(m.zoneName, 30), owner: str(m.owner, 20), phone: str(m.phone, 20), wechat: str(m.wechat, 40),
+    tags: tags.map(function (t) { return str(t, 12); }).filter(Boolean).slice(0, 6), intro: str(m.intro, 200),
+    level: ["diamond", "gold", "normal"].indexOf(m.level) >= 0 ? m.level : "normal",
+    minOrder: str(m.minOrder, 20), leadTime: str(m.leadTime, 20), hours: str(m.hours, 30),
+    license: str(m.license, 30), certExpire: str(m.certExpire, 10), verified: true, status: "approved",
+    rejectReason: "", featured: Boolean(m.featured), weight: Number(m.weight) || 60, views: 0, leads: 0,
+    joined: day(), updated: day(), fromApplication: m.appUid || ""
+  };
+}
+
+function nextMerchantId(list) {
+  let max = 0;
+  list.forEach(function (m) {
+    const n = parseInt(String(m.id || "").replace(/\D/g, ""), 10);
+    if (!isNaN(n) && n > max) max = n;
+  });
+  return "M-" + String(max + 1).padStart(3, "0");
+}
+
+const MAINTENANCE_HTML = "<!DOCTYPE html><html lang=\"zh-CN\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">" +
+  "<title>维护中 · 义乌AI圈</title><body style=\"margin:0;min-height:100vh;display:grid;place-items:center;background:#f6f3ec;color:#17150f;" +
+  "font:16px/1.8 'PingFang SC','Microsoft YaHei',system-ui,sans-serif\"><div style=\"max-width:420px;padding:40px 28px;text-align:center\">" +
+  "<div style=\"display:inline-grid;place-items:center;width:64px;height:64px;border:2px solid #c8381e;border-radius:50%;color:#c8381e;" +
+  "font-weight:700;transform:rotate(-8deg);margin-bottom:18px\">维护</div><h1 style=\"margin:0 0 8px;font-size:24px\">站点维护中</h1>" +
+  "<p style=\"margin:0;color:rgba(23,21,15,.6)\">我们正在升级服务，稍后回来看看。</p></div></body></html>";
 
 /* ------------------------------------------------------------- 静态资源 */
 
@@ -492,6 +706,11 @@ function serveStatic(req, res, pathname) {
   };
 
   if (!STATIC_ALLOW.test(rel) || rel.indexOf("..") >= 0) return notFound();
+
+  if (/\.html$/.test(rel) && rel !== "/admin.html" && siteToggles().maintenance && !isAdmin(req)) {
+    res.writeHead(503, { "Content-Type": MIME[".html"], "Cache-Control": "no-store", "Retry-After": "600" });
+    return res.end(MAINTENANCE_HTML);
+  }
 
   const filePath = path.resolve(STATIC_DIR, "." + rel);
   if (!filePath.startsWith(STATIC_DIR + path.sep)) return notFound();
@@ -542,7 +761,7 @@ route("GET", "/api/stats", function (req, res) {
     ok: true,
     users: Object.keys(d.users).length,
     posts: d.posts.length,
-    postsToday: d.posts.filter(function (p) { return sameDay(p.at, now); }).length,
+    postsToday: d.posts.filter(function (p) { return !p.hidden && sameDay(p.at, now); }).length,
     merchants: approvedMerchants()
   });
 });
@@ -633,6 +852,13 @@ route("POST", "/api/auth/session", async function (req, res) {
     }
   }
 
+  const existing = db().users[userIdFor(phone)];
+  if (!existing && siteToggles().register === false) {
+    return fail(res, 403, "register_closed", "暂停新用户注册，已有账号可正常登录");
+  }
+  if (existing && existing.status === "frozen") {
+    return fail(res, 403, "frozen", "账号已被冻结，如有疑问请联系运营");
+  }
   otps.delete(phone);
   guards.set(phone, Object.assign({}, g, { code: 0 }));
   const r = ensureUser(phone);
@@ -656,6 +882,7 @@ route("POST", "/api/auth/password", async function (req, res) {
   if (!user || !user.pwHash) {
     return fail(res, 400, "no_password", "该手机号尚未设置密码，请先用验证码登录");
   }
+  if (user.status === "frozen") return fail(res, 403, "frozen", "账号已被冻结，如有疑问请联系运营");
   if (!checkPassword(pw, user.pwHash)) {
     const fails = (g.pw || 0) + 1;
     if (fails >= 5) {
@@ -714,7 +941,7 @@ route("GET", "/api/posts", function (req, res) {
   const user = currentUser(req);
   sendJSON(res, 200, {
     ok: true,
-    posts: db().posts.slice(0, 200).map(publicPost),
+    posts: db().posts.filter(function (p) { return !p.hidden; }).slice(0, 200).map(publicPost),
     reactions: reactionSummary(user && user.id),
     comments: commentsSummary()
   });
@@ -784,6 +1011,7 @@ route("POST", /^\/api\/posts\/([A-Za-z0-9_-]{1,40})\/react$/, async function (re
 route("POST", /^\/api\/posts\/([A-Za-z0-9_-]{1,40})\/comments$/, async function (req, res, m) {
   const user = currentUser(req);
   if (!user) return fail(res, 401, "unauthorized", "请先登录");
+  if (siteToggles().comment === false) return fail(res, 403, "comment_closed", "评论功能暂时关闭");
   if (rateLimited("cmt:" + user.id, 20, 600e3)) return fail(res, 429, "too_frequent", "评论太频繁了，稍后再试");
   const body = await withBody(req, res);
   if (!body) return;
@@ -814,7 +1042,7 @@ route("GET", "/api/profiles", function (req, res, m, url) {
   /* 联系方式只给已登录用户，未登录访客拿到的是空值。 */
   if (profile && !viewer) profile = Object.assign({}, profile, { phone: "", wechat: "" });
   const author = db().users[uid];
-  const posts = db().posts.filter(function (p) { return p.uid === uid; }).slice(0, 50).map(publicPost);
+  const posts = db().posts.filter(function (p) { return p.uid === uid && !p.hidden; }).slice(0, 50).map(publicPost);
   const reactions = db().reactions;
   const likes = posts.reduce(function (s, p) { return s + ((reactions[p.id] && reactions[p.id].likes.length) || 0); }, 0);
   sendJSON(res, 200, {
@@ -850,6 +1078,7 @@ route("PUT", "/api/profiles/me", { limit: 6 * 1024 * 1024 }, async function (req
 route("POST", "/api/cert/apply", async function (req, res) {
   const user = currentUser(req);
   if (!user) return fail(res, 401, "unauthorized", "请先确认手机号");
+  if (siteToggles().merchantApply === false) return fail(res, 403, "apply_closed", "商家入驻申请暂时关闭");
   const body = await withBody(req, res);
   if (!body) return;
   const shopName = str(body.shopName, 80);
@@ -908,17 +1137,68 @@ route("GET", "/api/cert/status", async function (req, res) {
   });
 });
 
-/* --- 运营后台 --- */
+/* --- 前台：站点配置与商品目录（来自运营后台） --- */
+route("GET", "/api/site", function (req, res) {
+  const doc = db().admin || {};
+  const s = doc.settings || {};
+  const viewer = currentUser(req);
+  const t = siteToggles();
+  const hidePrice = t.showPrice === false && !viewer;
+  sendJSON(res, 200, {
+    ok: true,
+    settings: {
+      siteName: s.siteName || "义乌AI圈",
+      tagline: s.tagline || "",
+      ticker: Array.isArray(s.ticker) ? s.ticker : [],
+      toggles: { register: t.register !== false, comment: t.comment !== false, showPrice: t.showPrice !== false, merchantApply: t.merchantApply !== false }
+    },
+    dicts: doc.dicts || { zones: [], cats: [] },
+    merchants: (doc.merchants || []).filter(function (m) { return m && m.status === "approved"; })
+      .sort(function (a, b) { return (b.featured ? 1 : 0) - (a.featured ? 1 : 0) || (b.weight || 0) - (a.weight || 0); })
+      .map(function (m) {
+        return {
+          id: m.id, name: m.name, stall: m.stall, zone: m.zone, zoneName: m.zoneName, tags: m.tags || [], intro: m.intro,
+          level: m.level, minOrder: m.minOrder, leadTime: m.leadTime, hours: m.hours, verified: Boolean(m.verified),
+          featured: Boolean(m.featured), certExpire: m.certExpire || ""
+        };
+      }),
+    products: (doc.products || []).filter(function (p) { return p && p.status === "on"; })
+      .sort(function (a, b) { return (b.featured ? 1 : 0) - (a.featured ? 1 : 0) || (b.weight || 0) - (a.weight || 0); })
+      .map(function (p) {
+        return {
+          id: p.id, name: p.name, cat: p.cat, platform: p.platform, price: hidePrice ? null : p.price, unit: p.unit,
+          billing: p.billing, trial: p.trial, delivery: p.delivery, langs: p.langs, vendor: p.vendor, desc: p.desc,
+          badge: p.badge, featured: Boolean(p.featured)
+        };
+      }),
+    priceHidden: hidePrice
+  });
+});
+
+route("GET", /^\/api\/merchants\/([A-Za-z0-9_-]{1,20})\/contact$/, function (req, res, m) {
+  const user = currentUser(req);
+  if (!user) return fail(res, 401, "unauthorized", "查看联系方式需要先登录");
+  if (rateLimited("contact:" + user.id, 60, 3600e3)) return fail(res, 429, "too_frequent", "查看太频繁了，稍后再试");
+  const doc = db().admin || {};
+  const mer = (doc.merchants || []).find(function (x) { return x.id === m[1] && x.status === "approved"; });
+  if (!mer) return fail(res, 404, "not_found", "商家不存在或已下线");
+  sendJSON(res, 200, { ok: true, contact: { owner: mer.owner, phone: mer.phone, wechat: mer.wechat, hours: mer.hours } });
+});
+
+/* --- 运营后台：登录与账号 --- */
 route("POST", "/api/admin/login", async function (req, res) {
   const body = await withBody(req, res);
   if (!body) return;
   if (rateLimited("admin:" + clientIp(req), 8, 600e3)) return fail(res, 429, "too_frequent", "尝试次数过多，请 10 分钟后再试");
-  const c = adminCreds();
-  if (!safeEqual(str(body.user, 64), c.user) || !safeEqual(String(body.pass || ""), c.pass)) {
+  const user = str(body.user, 64);
+  if (!checkAdminLogin(user, String(body.pass || ""))) {
+    audit(req, "登录失败", "账号：" + (user || "（空）"), user || "—");
     return fail(res, 401, "bad_credentials", "账号或密码不正确");
   }
-  setCookie(res, ADMIN_COOKIE, sign({ a: c.user, i: Date.now() }), ADMIN_TTL_SECONDS);
-  sendJSON(res, 200, { ok: true, user: c.user, source: c.source });
+  const acc = adminAccount();
+  setCookie(res, ADMIN_COOKIE, sign({ a: acc.user, v: acc.ver, i: Date.now() }), ADMIN_TTL_SECONDS);
+  audit(req, "登录后台", acc.source === "default" ? "使用默认账号" : "", acc.user);
+  sendJSON(res, 200, { ok: true, account: publicAccount(acc) });
 });
 
 route("POST", "/api/admin/logout", function (req, res) {
@@ -926,18 +1206,44 @@ route("POST", "/api/admin/logout", function (req, res) {
   sendJSON(res, 200, { ok: true });
 });
 
+route("POST", "/api/admin/account", async function (req, res) {
+  const acc = adminSession(req);
+  if (!acc) return fail(res, 401, "unauthorized", "请先登录后台");
+  if (acc.source === "env") return fail(res, 409, "managed_by_env", "后台账号由服务器环境变量 ADMIN_USER / ADMIN_PASS 管理，请在服务器上修改");
+  const body = await withBody(req, res);
+  if (!body) return;
+  if (rateLimited("adminpw:" + clientIp(req), 10, 600e3)) return fail(res, 429, "too_frequent", "尝试次数过多，请稍后再试");
+  if (!checkAdminLogin(acc.user, String(body.current || ""))) return fail(res, 401, "bad_current", "当前密码不正确");
+  const user = str(body.user, 32) || acc.user;
+  const name = str(body.name, 20) || acc.name;
+  const pass = String(body.pass || "");
+  if (!/^[A-Za-z0-9_.-]{3,32}$/.test(user)) return fail(res, 400, "invalid_user", "账号需 3–32 位字母、数字、下划线、点或减号");
+  if (acc.source === "default" && !pass) return fail(res, 400, "need_password", "请设置新密码，默认密码不能继续使用");
+  if (pass && (pass.length < 10 || !/[A-Za-z]/.test(pass) || !/\d/.test(pass))) {
+    return fail(res, 400, "weak_password", "新密码至少 10 位，且同时包含字母和数字");
+  }
+  if (pass && pass === DEFAULT_ADMIN.pass) return fail(res, 400, "weak_password", "不能使用默认密码");
+  const prev = db().adminAuth || {};
+  db().adminAuth = {
+    user: user,
+    name: name,
+    pwHash: pass ? hashPassword(pass) : prev.pwHash,
+    ver: (prev.ver || 0) + 1,
+    updatedAt: Date.now()
+  };
+  if (db().admin && db().admin.settings) db().admin.settings.admin = { name: name };
+  store.save();
+  const next = adminAccount();
+  setCookie(res, ADMIN_COOKIE, sign({ a: next.user, v: next.ver, i: Date.now() }), ADMIN_TTL_SECONDS);
+  audit(req, "修改后台账号", (user !== acc.user ? "账号 " + acc.user + " → " + user + "；" : "") + (pass ? "已更换密码；" : "") + "其他会话已失效", user);
+  sendJSON(res, 200, { ok: true, account: publicAccount(next) });
+});
+
+/* --- 运营后台：整库数据（带版本号，防止多人同时编辑互相覆盖） --- */
 route("GET", "/api/admin/db", function (req, res) {
-  if (!isAdmin(req)) return fail(res, 401, "unauthorized", "请先登录后台");
-  const d = db();
-  sendJSON(res, 200, {
-    ok: true,
-    doc: d.admin,
-    live: {
-      users: Object.keys(d.users).length,
-      posts: d.posts.length,
-      applications: Object.keys(d.applications).map(function (k) { return d.applications[k]; })
-    }
-  });
+  const acc = adminSession(req);
+  if (!acc) return fail(res, 401, "unauthorized", "请先登录后台");
+  sendJSON(res, 200, { ok: true, doc: db().admin, rev: db().adminRev, live: liveData(), account: publicAccount(acc) });
 });
 
 route("PUT", "/api/admin/db", { limit: 8 * 1024 * 1024 }, async function (req, res) {
@@ -945,12 +1251,184 @@ route("PUT", "/api/admin/db", { limit: 8 * 1024 * 1024 }, async function (req, r
   const body = await withBody(req, res, 8 * 1024 * 1024);
   if (!body) return;
   const doc = body.doc;
-  if (!doc || typeof doc !== "object" || !Array.isArray(doc.users) || !doc.settings) {
+  if (!doc || typeof doc !== "object" || !doc.settings || !Array.isArray(doc.merchants) || !Array.isArray(doc.products)) {
     return fail(res, 400, "invalid_doc", "数据结构不正确");
   }
-  db().admin = doc;
+  if (Number(body.rev) !== db().adminRev) {
+    return sendJSON(res, 409, {
+      ok: false, error: "conflict", message: "其他管理员刚刚修改过数据，已为你加载最新版本",
+      doc: db().admin, rev: db().adminRev, live: liveData()
+    });
+  }
+  const prev = db().admin;
+  const next = cleanDoc(doc, prev);
+  const summary = diffDoc(prev, next);
+  if (!summary) return sendJSON(res, 200, { ok: true, rev: db().adminRev, unchanged: true });
+  db().admin = next;
+  db().adminRev += 1;
   store.save();
-  sendJSON(res, 200, { ok: true, savedAt: Date.now() });
+  audit(req, "保存后台数据", summary);
+  sendJSON(res, 200, { ok: true, rev: db().adminRev });
+});
+
+route("POST", "/api/admin/reset", function (req, res) {
+  if (!isAdmin(req)) return fail(res, 401, "unauthorized", "请先登录后台");
+  const prev = db().admin;
+  db().admin = adminSeed.migrate(adminSeed.seed());
+  db().admin.settings.admin = { name: (prev && prev.settings && prev.settings.admin && prev.settings.admin.name) || "管理员" };
+  db().adminRev += 1;
+  store.save();
+  audit(req, "恢复初始数据", "商家、AI 工具、资讯、方案、订单恢复为初始内容（真实用户与帖子不受影响）");
+  sendJSON(res, 200, { ok: true, rev: db().adminRev });
+});
+
+route("GET", "/api/admin/audit", function (req, res) {
+  if (!isAdmin(req)) return fail(res, 401, "unauthorized", "请先登录后台");
+  sendJSON(res, 200, { ok: true, items: db().audit.slice(0, 200) });
+});
+
+/* --- 运营后台：真实用户 --- */
+const PLAN_IDS = ["free", "pro", "studio"];
+
+function applyMemberPatch(u, body) {
+  if (body.name !== undefined) {
+    const n = str(body.name, 30);
+    if (n.length < 2 || n.length > 14) return "昵称 2-14 个字";
+    u.nickname = n;
+  }
+  if (body.plan !== undefined) {
+    const plans = ((db().admin && db().admin.plans) || []).map(function (p) { return p.id; });
+    if ((plans.length ? plans : PLAN_IDS).indexOf(body.plan) < 0) return "订阅方案不存在";
+    u.plan = body.plan;
+  }
+  if (body.status !== undefined) {
+    if (["active", "expired", "frozen"].indexOf(body.status) < 0) return "账号状态不正确";
+    u.status = body.status;
+  }
+  if (body.expire !== undefined) {
+    if (body.expire && !/^\d{4}-\d{2}-\d{2}$/.test(body.expire)) return "到期日格式不正确";
+    u.expire = body.expire || "";
+  }
+  if (body.spend !== undefined) u.spend = Math.max(0, Math.round(Number(body.spend) || 0));
+  if (body.note !== undefined) u.note = str(body.note, 200);
+  u.updatedAt = Date.now();
+  return "";
+}
+
+route("POST", "/api/admin/members", async function (req, res) {
+  if (!isAdmin(req)) return fail(res, 401, "unauthorized", "请先登录后台");
+  const body = await withBody(req, res);
+  if (!body) return;
+  const phone = str(body.phone, 20).replace(/\s|-/g, "");
+  if (!isValidPhone(phone)) return fail(res, 400, "invalid_phone", "请输入有效的 11 位手机号");
+  const id = userIdFor(phone);
+  if (db().users[id]) return fail(res, 409, "exists", "这个手机号已经注册过了");
+  const u = { id: id, phone: phone, nickname: "义乌新朋友" + phone.slice(-4), tone: toneFor(phone), pwHash: "", createdAt: Date.now(), updatedAt: Date.now(), onboarded: true, createdBy: "admin" };
+  const err = applyMemberPatch(u, body);
+  if (err) return fail(res, 400, "invalid", err);
+  db().users[id] = u;
+  store.save();
+  audit(req, "新增用户", u.nickname + "（" + maskPhone(phone) + "）");
+  sendJSON(res, 200, { ok: true, member: adminMembers().find(function (x) { return x.id === id; }) });
+});
+
+route("PATCH", /^\/api\/admin\/members\/(u_[a-f0-9]{24})$/, async function (req, res, m) {
+  if (!isAdmin(req)) return fail(res, 401, "unauthorized", "请先登录后台");
+  const u = db().users[m[1]];
+  if (!u) return fail(res, 404, "not_found", "用户不存在");
+  const body = await withBody(req, res);
+  if (!body) return;
+  const before = { plan: u.plan || "free", status: memberStatus(u), expire: u.expire || "" };
+  const err = applyMemberPatch(u, body);
+  if (err) return fail(res, 400, "invalid", err);
+  store.save();
+  const after = { plan: u.plan || "free", status: memberStatus(u), expire: u.expire || "" };
+  const changes = Object.keys(after).filter(function (k) { return before[k] !== after[k]; })
+    .map(function (k) { return { plan: "方案", status: "状态", expire: "到期" }[k] + " " + (before[k] || "—") + " → " + (after[k] || "—"); });
+  audit(req, after.status === "frozen" && before.status !== "frozen" ? "冻结用户" : "修改用户", u.nickname + (changes.length ? "：" + changes.join("，") : ""));
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", /^\/api\/admin\/members\/(u_[a-f0-9]{24})$/, function (req, res, m) {
+  if (!isAdmin(req)) return fail(res, 401, "unauthorized", "请先登录后台");
+  const u = db().users[m[1]];
+  if (!u) return fail(res, 404, "not_found", "用户不存在");
+  delete db().users[m[1]];
+  delete db().profiles[m[1]];
+  store.save();
+  audit(req, "删除用户", u.nickname + "（" + maskPhone(u.phone) + "），帖子保留");
+  sendJSON(res, 200, { ok: true });
+});
+
+/* --- 运营后台：社区帖子 --- */
+route("PATCH", /^\/api\/admin\/posts\/([A-Za-z0-9_-]{1,40})$/, async function (req, res, m) {
+  if (!isAdmin(req)) return fail(res, 401, "unauthorized", "请先登录后台");
+  const p = db().posts.find(function (x) { return x.id === m[1]; });
+  if (!p) return fail(res, 404, "not_found", "帖子不存在");
+  const body = await withBody(req, res);
+  if (!body) return;
+  p.hidden = body.status === "hidden";
+  store.save();
+  audit(req, p.hidden ? "隐藏帖子" : "恢复帖子", "「" + p.title + "」");
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", /^\/api\/admin\/posts\/([A-Za-z0-9_-]{1,40})$/, function (req, res, m) {
+  if (!isAdmin(req)) return fail(res, 401, "unauthorized", "请先登录后台");
+  const list = db().posts;
+  const idx = list.findIndex(function (x) { return x.id === m[1]; });
+  if (idx < 0) return fail(res, 404, "not_found", "帖子不存在");
+  const p = list[idx];
+  list.splice(idx, 1);
+  delete db().reactions[p.id];
+  delete db().comments[p.id];
+  store.save();
+  audit(req, "删除帖子", "「" + p.title + "」");
+  sendJSON(res, 200, { ok: true });
+});
+
+/* --- 运营后台：商家认证申请 --- */
+route("POST", /^\/api\/admin\/applications\/(u_[a-f0-9]{24})$/, async function (req, res, m) {
+  if (!isAdmin(req)) return fail(res, 401, "unauthorized", "请先登录后台");
+  const app = db().applications[m[1]];
+  if (!app) return fail(res, 404, "not_found", "申请不存在");
+  const body = await withBody(req, res);
+  if (!body) return;
+  if (body.action === "approve") {
+    const doc = db().admin;
+    const mer = cleanMerchant(Object.assign({ appUid: m[1] }, body.merchant || {}), {
+      name: app.shopName, stall: app.stallNo, zone: zoneKey(app.zone), zoneName: app.zone, owner: app.contactName,
+      phone: (db().users[m[1]] || {}).phone || "", wechat: app.wechat, intro: app.intro
+    });
+    mer.id = nextMerchantId(doc.merchants);
+    doc.merchants.unshift(mer);
+    app.status = "approved";
+    app.rejectReason = "";
+    app.decidedAt = Date.now();
+    db().adminRev += 1;
+    store.save();
+    audit(req, "通过商家认证", app.shopName + " → 已上架为 " + mer.id);
+    return sendJSON(res, 200, { ok: true, rev: db().adminRev, merchantId: mer.id });
+  }
+  if (body.action === "reject") {
+    app.status = "rejected";
+    app.rejectReason = str(body.reason, 120) || "资料不完整，请补充后重新提交";
+    app.decidedAt = Date.now();
+    store.save();
+    audit(req, "拒绝商家认证", app.shopName + "：" + app.rejectReason);
+    return sendJSON(res, 200, { ok: true });
+  }
+  fail(res, 400, "invalid_action", "操作不正确");
+});
+
+route("DELETE", /^\/api\/admin\/applications\/(u_[a-f0-9]{24})$/, function (req, res, m) {
+  if (!isAdmin(req)) return fail(res, 401, "unauthorized", "请先登录后台");
+  const app = db().applications[m[1]];
+  if (!app) return fail(res, 404, "not_found", "申请不存在");
+  delete db().applications[m[1]];
+  store.save();
+  audit(req, "删除认证申请", app.shopName);
+  sendJSON(res, 200, { ok: true });
 });
 
 async function handleApi(req, res, pathname, url) {
@@ -1004,10 +1482,12 @@ const server = http.createServer(function (req, res) {
   serveStatic(req, res, pathname);
 });
 
+initAdminDoc();
+
 server.listen(PORT, HOST, function () {
   console.log("[yiwu-ai-circle] http://" + HOST + ":" + PORT + "  static=" + STATIC_DIR + "  data=" + store.file);
-  console.log("[yiwu-ai-circle] payment=" + Boolean(WAG_API_KEY && WAG_ENTITLEMENT_ID) + " sms=" + SMS_MODE + " admin=" + adminCreds().source);
-  if (adminCreds().source === "default") {
+  console.log("[yiwu-ai-circle] payment=" + Boolean(WAG_API_KEY && WAG_ENTITLEMENT_ID) + " sms=" + SMS_MODE + " admin=" + adminAccount().source);
+  if (adminAccount().source === "default") {
     console.warn("[yiwu-ai-circle] ⚠ 运营后台仍在使用默认账号 admin / ywai2026，上线前请设置 ADMIN_USER / ADMIN_PASS");
   }
 });
