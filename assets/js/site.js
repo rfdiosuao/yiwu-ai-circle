@@ -743,6 +743,33 @@
     });
   }
 
+  /* ---------------- 行情滚动条：可暂停（WCAG 2.2.2） ---------------- */
+  (function tickerToggle() {
+    var ticker = document.querySelector(".ticker");
+    if (!ticker) return;
+    var PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg>';
+    var PLAY = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 5.5v13l10-6.5z"></path></svg>';
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "ticker-toggle";
+    btn.setAttribute("aria-label", "暂停行情滚动");
+    ticker.insertAdjacentElement("afterend", btn);
+    var paused = false;
+    try { paused = localStorage.getItem("ywai.ticker.paused") === "1"; } catch (e) {}
+    function paint() {
+      ticker.classList.toggle("is-paused", paused);
+      btn.innerHTML = paused ? PLAY : PAUSE;
+      btn.setAttribute("aria-pressed", paused ? "true" : "false");
+      btn.title = paused ? "继续滚动" : "暂停滚动";
+    }
+    btn.addEventListener("click", function () {
+      paused = !paused;
+      try { localStorage.setItem("ywai.ticker.paused", paused ? "1" : "0"); } catch (e) {}
+      paint();
+    });
+    paint();
+  })();
+
   /* ---------------- 手机端「发帖」悬浮按钮 ---------------- */
   document.addEventListener("click", function (e) {
     var fab = e.target.closest("[data-fab-compose]");
