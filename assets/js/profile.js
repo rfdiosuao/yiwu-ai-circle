@@ -58,7 +58,7 @@
         tagline: "把义乌的小商品，卖到中东的货架上。",
         bio: "在义乌做了六年跨境。现在一个人跑选品、拍内容、发货，AI 是唯一的同事。\n白天在商贸城，晚上在青口，凌晨回消息。",
         theme: "paper", tone: 1, avatar: "",
-        phone: "13800138000", wechat: "alan_yiwu", joined: "2026-07-11",
+        phone: "", wechat: "", joined: "2026-07-11",
         tags: ["中东专线", "家居小件", "TikTok Shop", "AI 选品"],
         doing: [
           { t: "中东家居小件选品", d: "每周跑两趟商贸城二区，专挑能进沙特家庭的小件，客单 30-80 元。" },
@@ -76,7 +76,7 @@
         tagline: "一条视频，顶一个业务员。",
         bio: "拍过 3000 条带货视频，跑通过 12 个类目。现在只接能长期合作的工厂。",
         theme: "ink", tone: 2, avatar: "",
-        phone: "13911112222", wechat: "acan_video", joined: "2026-04-20",
+        phone: "", wechat: "", joined: "2026-04-20",
         tags: ["TikTok 内容", "美区", "脚本模板", "工厂出海"],
         doing: [
           { t: "短视频代运营", d: "从脚本、拍摄到投流，按条或按月结算，不做纯剪辑。" },
@@ -93,7 +93,7 @@
         tagline: "北下朱没有卖不掉的货，只有不对的价。",
         bio: "在北下朱守了九年仓。谁的货压手了，可以来找我看看。",
         theme: "red", tone: 1, avatar: "",
-        phone: "13755551203", wechat: "zhuge_huoyuan", joined: "2025-12-30",
+        phone: "", wechat: "", joined: "2025-12-30",
         tags: ["尾货", "一件代发", "直播供货", "9.9 包邮"],
         doing: [
           { t: "尾货收购与清仓", d: "库存、尾单、断码都收，现金结算，量大的可以上门。" },
@@ -110,7 +110,7 @@
         tagline: "替中东客户，在义乌把好每一道关。",
         bio: "来自利雅得，在义乌七年。中文、阿拉伯语、英语都能谈。帮客户验货、盯船期。",
         theme: "teal", tone: 3, avatar: "",
-        phone: "13655556666", wechat: "hassan_yw", joined: "2026-02-14",
+        phone: "", wechat: "", joined: "2026-02-14",
         tags: ["SASO 合规", "验货", "阿语翻译", "中东渠道"],
         doing: [
           { t: "采购代理与验货", d: "按客户清单跑市场、比价、验货，出货前拍完整视频。" },
@@ -127,7 +127,7 @@
         tagline: "老手艺，也能做成年轻人愿意送人的礼物。",
         bio: "佛堂做红糖第三代。现在把红糖做成礼盒、伴手礼和联名款。",
         theme: "paper", tone: 4, avatar: "",
-        phone: "13733335518", wechat: "fotang_tang", joined: "2026-01-08",
+        phone: "", wechat: "", joined: "2026-01-08",
         tags: ["非遗工艺", "礼盒定制", "内容电商", "佛堂"],
         doing: [
           { t: "红糖文创礼盒", d: "节气礼盒、企业定制、婚庆伴手礼，起订 20 盒。" },
@@ -144,7 +144,7 @@
         tagline: "每天整理一条对你有用的义乌情报。",
         bio: "义乌AI圈官方账号。政策、行情、线下活动，先在这里发。",
         theme: "ink", tone: 2, avatar: "",
-        phone: "13000000000", wechat: "ywai_official", joined: "2025-11-16",
+        phone: "", wechat: "", joined: "2025-11-16",
         tags: ["政策速递", "官方", "圈子运营"],
         doing: [
           { t: "政策与行情整理", d: "每天扫一遍政府与平台公告，挑出影响发货和结汇的部分。" },
@@ -307,12 +307,11 @@
   }
 
   function renderSide() {
-    var authed = !!session;
     var c = $("#pContact");
     var html = '<div class="scard"><div class="scard__head"><span>Contact · 名片</span><span>' +
-      (authed ? "已解锁" : "需登录") + "</span></div>";
+      (isOwner ? "本人可见" : "未公开") + "</span></div>";
 
-    if (authed) {
+    if (isOwner) {
       html += '<div class="crow"><span>手机</span><b>' + esc(profile.phone || "——") + "</b></div>";
       if (profile.phone) {
         html += '<button class="copy-btn" type="button" data-copy="' + esc(profile.phone) + '"><span>复制手机号</span><i>COPY</i></button>';
@@ -321,11 +320,6 @@
       if (profile.wechat) {
         html += '<button class="copy-btn" type="button" data-copy="' + esc(profile.wechat) + '"><span>复制微信号</span><i>COPY</i></button>';
       }
-    } else {
-      html += '<div class="crow"><span>手机</span><b class="masked">' + esc(profile.phone || "13800000000") + "</b></div>";
-      html += '<div class="crow"><span>微信</span><b class="masked">' + esc(profile.wechat || "ywai_0000") + "</b></div>";
-      html += '<div class="lock-row"><span>登录后查看完整联系方式</span>' +
-        '<button class="row-btn" type="button" data-gate>登录</button></div>';
     }
 
     if (!isOwner) {
@@ -356,14 +350,6 @@
 
   /* ---------------- actions ---------------- */
   document.addEventListener("click", function (e) {
-    var gate = e.target.closest("[data-gate]");
-    if (gate) {
-      A.openGate("登录后即可查看 " + profile.nickname + " 的联系方式。", function () {
-        location.reload();
-      });
-      return;
-    }
-
     var copy = e.target.closest("[data-copy]");
     if (copy) {
       var v = copy.dataset.copy;
@@ -692,10 +678,10 @@
 
       if (r.profile) {
         profile = r.profile;
-      } else if (phone && seeds[phone]) {
-        profile = seeds[phone];
       } else if (isOwner && session) {
         profile = defaultProfile(session);
+      } else if (phone && seeds[phone]) {
+        profile = seeds[phone];
       } else {
         notFound("这个主页还没被布置", (phone ? phone.replace(/(\d{3})\d{4}(\d{4})/, "$1 **** $2") : "这位圈友") + " 还没有填写主页资料。");
         return;

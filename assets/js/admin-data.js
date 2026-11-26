@@ -3,7 +3,7 @@
    - 后台数据全部来自服务端（/api/admin/db），浏览器不再缓存任何后台数据。
    - 「用户」「社区帖子」是真实注册用户与真实帖子；商家列表里会混入待审核的认证申请。
    - admin.js 照常修改 db 并调用 save()：这里负责把改动拆成两类同步回服务端：
-       1. 商家 / 工具 / 资讯 / 方案 / 订单 / 设置 → 整库保存（带版本号，冲突时加载最新版）
+       1. 商家 / 工具 / 资讯 / 方案 / 订单 / 设置 → 整库保存（带版本号，冲突时停止提交）
        2. 用户、帖子、认证申请 → 逐条调用对应接口（冻结、隐藏、通过审核等）
    ========================================================================== */
 (function () {
@@ -11,7 +11,10 @@
 
   var DAY = 86400000;
 
-  try { localStorage.removeItem("ywai.admin.db.v1"); } catch (e) {}
+  try {
+    localStorage.removeItem("ywai.admin.db.v1");
+    localStorage.removeItem("ywai.admin.session.v1");
+  } catch (e) {}
 
   function skeleton() {
     return {
@@ -36,6 +39,7 @@
 
   var db = skeleton();
   var rev = 0;
+  var demoAllowed = false;
   var snap = { users: {}, posts: {}, apps: {} };
 
   /* ---------------- 请求 ---------------- */
@@ -97,6 +101,7 @@
       if (!r.ok) return r;
       replace(r.doc, r.live, r.rev);
       window.AdminDB.account = r.account || null;
+      demoAllowed = r.demoAllowed === true;
       notify("loaded");
       return r;
     });
@@ -169,7 +174,6 @@
   var online = false;
   var pushTimer = null;
   var pushing = null;
-  var dirty = false;
 
   function runOps(ops) {
     var errors = [];
@@ -187,51 +191,45 @@
     pushTimer = null;
     if (!online) return Promise.resolve({ ok: false });
     if (pushing) {
-      dirty = true;
       return pushing;
     }
-    dirty = false;
     notify("saving");
     var ops = liveOps();
-    var conflict = false;
 
-    pushing = req("PUT", "/api/admin/db", { doc: docPayload(), rev: rev }).then(function (r) {
-      if (r.status === 401) {
+    pushing = (async function () {
+      var result = await req("PUT", "/api/admin/db", { doc: docPayload(), rev: rev });
+      if (result.status === 401 || result.status === 409) {
         online = false;
-        notify("expired");
-        return r;
+        notify(result.status === 401 ? "expired" : "conflict", result.message);
+        return result;
       }
-      if (r.status === 409) {
-        conflict = true;
-        return r;
+      if (!result.ok) {
+        notify("error", result.message || "保存失败");
+        return result;
       }
-      if (r.ok) rev = r.rev;
-      return r;
-    }).then(function (r) {
-      return runOps(ops).then(function (errors) {
-        var needPull = conflict || ops.length > 0;
-        return (needPull ? pull() : Promise.resolve()).then(function () {
-          if (conflict) notify("conflict", r.message);
-          else if (errors.length) notify("error", errors.join("；"));
-          else if (!r.ok && r.status !== 409) notify("error", r.message || "保存失败");
-          else notify("saved");
-          return r;
-        });
-      });
-    }).then(function (r) {
-      pushing = null;
-      if (dirty) return push();
-      return r;
-    }, function (err) {
-      pushing = null;
-      notify("error", "保存失败");
-      throw err;
-    });
+      rev = result.rev;
+      if (ops.length) {
+        var errors = await runOps(ops);
+        var refreshed = await pull();
+        // Some operations may already have succeeded. Require a fresh read before another write.
+        if (!refreshed.ok) {
+          online = false;
+          notify("conflict", "操作已发送，但无法确认最新数据，请刷新后核对结果");
+          return refreshed;
+        }
+        if (errors.length) {
+          notify("error", errors.join("；"));
+          return { ok: false };
+        }
+      }
+      notify("saved");
+      return result;
+    })().finally(function () { pushing = null; });
     return pushing;
   }
 
   function save() {
-    if (!online) return;
+    if (!online || pushing) return;
     clearTimeout(pushTimer);
     pushTimer = setTimeout(push, 350);
     notify("pending");
@@ -245,27 +243,43 @@
     }
   });
 
-  function reset() {
-    return req("POST", "/api/admin/reset").then(function () { return pull(); });
+  async function reset() {
+    if (!online || !demoAllowed || pushing) return { ok: false, message: "当前无法恢复演示数据" };
+    clearTimeout(pushTimer);
+    pushTimer = null;
+    notify("saving");
+    var result = await req("POST", "/api/admin/reset");
+    if (result.ok) result = await pull();
+    if (!result.ok) notify("error", result.message || "恢复失败，请刷新后核对数据");
+    return result;
   }
 
   function login(user, pass) {
-    return req("POST", "/api/admin/login", { user: user, pass: pass }).then(function (r) {
-      if (r.ok) online = true;
-      return r;
-    });
+    return req("POST", "/api/admin/login", { user: user, pass: pass });
   }
 
-  function logout() {
-    online = false;
-    return req("POST", "/api/admin/logout");
+  async function logout() {
+    if (pushTimer || pushing) {
+      var saved = await push();
+      if (!saved.ok) return saved;
+    }
+    var result = await req("POST", "/api/admin/logout");
+    if (result.ok) {
+      online = false;
+      replace(null, null, 0);
+      window.AdminDB.account = null;
+    }
+    return result;
   }
 
   function changeAccount(body) {
-    return req("POST", "/api/admin/account", body).then(function (r) {
+    return req("POST", "/api/admin/account", body).then(async function (r) {
       if (r.ok) {
-        window.AdminDB.account = r.account;
-        db.settings.admin = { name: r.account.name };
+        var refreshed = await pull();
+        if (!refreshed.ok) {
+          online = false;
+          notify("conflict", "账号已更新，请刷新后台同步最新数据");
+        }
       }
       return r;
     });
@@ -324,6 +338,7 @@
     account: null,
     save: save,
     reset: reset,
+    demoAllowed: function () { return demoAllowed; },
     pull: function () {
       return pull().then(function (r) {
         if (r.ok) online = true;

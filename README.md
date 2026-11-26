@@ -9,9 +9,9 @@ npm start
 # 打开 http://localhost:8000
 ```
 
-- 默认是演示短信模式：验证码会直接显示在页面提示里。
-- 运营后台：`/admin.html`，首次使用默认账号 `admin / ywai2026` 登录，登录后页面顶部会提示，
-  请到「站点设置 → 管理员账号」立即改密码（或用环境变量 `ADMIN_USER` / `ADMIN_PASS` 固定账号）。
+- 开发环境默认监听 `127.0.0.1`，演示短信会在页面显示验证码。
+- 首次使用运营后台 `/admin.html` 前，配置 `ADMIN_USER` 和 `ADMIN_PASS`。升级前已有的后台哈希账号仍可登录。
+- `npm run check` 检查 JavaScript 语法，`npm test` 启动隔离实例运行回归测试。
 
 ## 数据持久化
 
@@ -23,7 +23,7 @@ npm start
 | 个人主页 | 简介、标签、联系方式、头像与相册（压缩后的图片） |
 | 社区 | 圈友帖子、点赞、收藏、评论 |
 | 商家认证 | 认证申请资料 |
-| 运营后台 | 商家、AI 工具、资讯、方案、订单、站点设置（首次启动自动写入初始内容，见 `lib/admin-seed.js`） |
+| 运营后台 | 商家、AI 工具、资讯、方案、订单、站点设置。新生产实例从空商家、工具、资讯、订单和统计起步 |
 | 后台账号 | 账号与 scrypt 哈希后的密码（不再明文保存，也不会下发到浏览器） |
 | 操作日志 | 后台登录、改账号、保存数据、处理用户/帖子/认证的记录，保留最近 500 条 |
 
@@ -37,19 +37,22 @@ npm start
 | 变量 | 说明 |
 | --- | --- |
 | `PORT` | 端口，默认 8000 |
-| `SESSION_SECRET` | 会话签名密钥；不填会自动生成并存到 `data/.session-secret` |
+| `HOST` | 监听地址，默认 `127.0.0.1` |
+| `NODE_ENV` | 线上设为 `production`，启用生产配置校验并关闭演示恢复 |
+| `SESSION_SECRET` | 生产必填，使用至少 32 字节随机密钥。开发可自动生成并保存到 `data/.session-secret` |
 | `ADMIN_USER` / `ADMIN_PASS` | 后台账号。设置后以此为准，忽略后台「设置」页里的账号 |
 | `SMS_MODE` | `demo`（演示）或 `api`（真实短信） |
-| `SMS_SEND_URL` / `SMS_VERIFY_URL` | 真实短信的发送 / 校验接口（表单 POST `phone`、`code`） |
+| `SMS_SEND_URL` / `SMS_VERIFY_URL` | 短信上游接口接收表单 POST `phone`、`code`。成功返回 HTTP 2xx 和 JSON `{ "ok": true }`，验证码错误返回 `{ "ok": false }` 或 HTTP 400 / 401 / 403 |
 | `WAG_API_KEY` / `WAG_ENTITLEMENT_ID` | 爱猹收支付，商家认证付费用 |
 | `CERT_PRICE` | 认证价格，默认 99 |
 | `DATA_DIR` | 数据目录，默认 `./data` |
-| `COOKIE_SECURE` | `1` 强制 Secure Cookie；留空按是否 HTTPS 自动判断 |
+| `COOKIE_SECURE` | `1` 强制 Secure Cookie，生产默认开启 |
+| `TRUST_PROXY` / `TRUSTED_PROXY_IPS` | 只有前者设为 `1` 且连接来自后者列出的 IP，才读取反代头。默认可信地址是回环地址 |
 
 ## 上线清单
 
-1. 设置 `ADMIN_USER` / `ADMIN_PASS`、`SESSION_SECRET`。
-2. 前面挂 Nginx / Caddy 做 HTTPS，反向代理到 `8000`，并传 `X-Forwarded-Proto`。
+1. 设置 `NODE_ENV=production`、随机 `SESSION_SECRET`，以及 `ADMIN_USER` 和至少 12 位的 `ADMIN_PASS`。已有独立哈希账号可以继续使用。仅有旧版明文账号的部署，首次升级时先配置环境变量账号。
+2. 前面挂 Nginx / Caddy 做 HTTPS，限制后端端口只能由反代访问。配置可信反代地址，并由反代覆盖 `X-Forwarded-Proto`、正确设置 `X-Forwarded-For`。
 3. 用 systemd / pm2 守护进程，`data/` 放在持久化磁盘上并定期备份。
 4. 接真实短信：服务端设 `SMS_MODE=api` 与两个接口地址，同时把 `assets/js/config.js` 里的 `sms.mode` 改为 `"api"`（隐藏页面上的演示提示）。
 
@@ -62,10 +65,10 @@ npm start
 - **商家档口**：前台「商家认证」提交的申请会以「认证申请」标签出现在列表里，点「通过」后自动上架为正式商家。
 - **商家 / AI 工具**：前台商家页、AI 工具页、首页预览都直接读取后台数据；商家联系方式只对已登录用户返回。
 - **站点设置**：开放注册、允许评论、前台展示价格、接受入驻申请、维护模式都会真实生效（服务端校验）。
-- **多人编辑**：后台数据带版本号，两人同时修改时后保存的一方会收到提示并加载最新版本，不会互相覆盖。
+- **多人编辑**：整库提交要求当前版本号。冲突时当前页面保留编辑结果并停止继续提交，刷新后可按最新版重新应用修改。真实用户、帖子和认证操作在整库请求成功后逐条提交。
 - **操作日志**：左侧「操作日志」可查看谁在什么时候改了什么。
 
-从旧版升级时，启动会自动迁移：旧的明文后台密码转为哈希，旧的演示用户 / 演示帖子被移除。
+升级前备份 `data/`。启动时旧后台明文密码转为哈希，并移除旧的演示用户和帖子集合。已有商家、工具、订单和设置会保留。版本号由服务端管理，保存时对记录及设置执行字段校验。浏览器导出会移除结构化的账号口令、联系方式和收款字段，完整备份请使用服务端数据目录。
 
 ## 接口一览
 
@@ -78,7 +81,7 @@ npm start
 | GET / POST | `/api/posts` | 帖子列表（含点赞、评论）/ 发帖 |
 | POST | `/api/posts/:id/react`、`/api/posts/:id/comments` | 点赞收藏切换 / 评论 |
 | DELETE | `/api/posts/:id` | 删除自己的帖子 |
-| GET / PUT | `/api/profiles`、`/api/profiles/me` | 查看主页（未登录不返回联系方式）/ 保存自己的主页 |
+| GET / PUT | `/api/profiles`、`/api/profiles/me` | 查看主页（个人联系方式仅本人可见）/ 保存自己的主页 |
 | POST / GET | `/api/cert/apply`、`/api/cert/status` | 商家认证申请 / 支付状态 |
 | GET | `/api/site` | 前台读取商家、AI 工具与站点开关 |
 | GET | `/api/merchants/:id/contact` | 商家联系方式（需登录） |

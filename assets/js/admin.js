@@ -58,7 +58,7 @@
 
   function opts(list, cur) {
     return list.map(function (o) {
-      return '<option value="' + o.v + '"' + (String(o.v) === String(cur) ? " selected" : "") + ">" + esc(o.t) + "</option>";
+      return '<option value="' + esc(o.v) + '"' + (String(o.v) === String(cur) ? " selected" : "") + ">" + esc(o.t) + "</option>";
     }).join("");
   }
 
@@ -123,6 +123,7 @@
   }
 
   function lineChart(values, labels) {
+    values = labels.map(function (_, index) { return Number(values[index]) || 0; });
     var W = 720, H = 208, L = 40, R = 10, T = 12, B = 26;
     var max = Math.max.apply(null, values) * 1.14 || 1;
     var iw = W - L - R, ih = H - T - B;
@@ -294,7 +295,7 @@
   /* ---------------- router ---------------- */
   function routeName() {
     var h = (location.hash || "").replace(/^#\/?/, "");
-    return TITLES[h] ? h : "dashboard";
+    return Object.prototype.hasOwnProperty.call(TITLES, h) ? h : "dashboard";
   }
 
   var PAINT = {};
@@ -332,7 +333,7 @@
 
       var planRows = db.plans.map(function (p) {
         var n = db.users.filter(function (u) { return u.plan === p.id; }).length;
-        var pct = Math.round((n / db.users.length) * 100);
+        var pct = db.users.length ? Math.round((n / db.users.length) * 100) : 0;
         return '<div class="dist__row">' +
           '<div class="dist__top"><b>' + esc(p.name) + "</b>" +
           '<span>' + n + " 人 · " + pct + "%</span></div>" +
@@ -358,7 +359,7 @@
       return '<div class="ahead">' +
         '<div><div class="ahead__kicker"><b>00</b><span>今日经营</span></div>' +
         "<h1>总览</h1>" +
-        '<p class="ahead__sub">用户、订阅、商家、内容，一张桌子看完。所有改动即时保存到本机；接上真实接口后，这里就是前台的唯一数据源。</p></div>' +
+        '<p class="ahead__sub">查看用户、订阅、商家和内容。数据同步状态显示在页面顶部。</p></div>' +
         '<div class="ahead__actions">' +
         '<button class="btn btn--sm btn--ghost" type="button" data-go="articles">发一条资讯</button>' +
         '<button class="btn btn--sm btn--red" type="button" data-go="users">管理用户</button>' +
@@ -371,7 +372,7 @@
         db.users.filter(function (u) { return u.status === "frozen"; }).length + "</b></div></div>" +
         '<div class="kpi"><div class="kpi__label"><span>付费订阅</span><i>PAID</i></div>' +
         '<div class="kpi__value">' + paid.length + '<small> / ' + db.users.length + "</small></div>" +
-        '<div class="kpi__foot">付费率 <b>' + Math.round((paid.length / db.users.length) * 100) + "%</b></div></div>" +
+        '<div class="kpi__foot">付费率 <b>' + (db.users.length ? Math.round((paid.length / db.users.length) * 100) : 0) + "%</b></div></div>" +
         '<div class="kpi"><div class="kpi__label"><span>近 12 日流水</span><i>GMV</i></div>' +
         '<div class="kpi__value">' + money(revenue) + "</div>" +
         '<div class="kpi__foot kpi__up"><b>+23.4%</b> 较上周期</div></div>' +
@@ -443,7 +444,7 @@
   function chipGroup(view, group, list) {
     var cur = state.f[view][group];
     return '<div style="display:flex;gap:5px;flex-wrap:wrap">' + list.map(function (it) {
-      return '<button class="chip' + (cur === it[0] ? " is-on" : "") + '" type="button" data-filter="' + group + '" data-val="' + it[0] + '">' + it[1] + "</button>";
+      return '<button class="chip' + (cur === it[0] ? " is-on" : "") + '" type="button" data-filter="' + group + '" data-val="' + esc(it[0]) + '">' + esc(it[1]) + "</button>";
     }).join("") + "</div>";
   }
 
@@ -460,7 +461,7 @@
       var left = DB.daysLeft(u.expire);
       var expTxt = u.expire ? u.expire : "—";
       var expCls = left !== null && left <= 7 ? "color:var(--red)" : "";
-      return '<tr data-act="user:open" data-id="' + u.id + '">' +
+      return '<tr data-act="user:open" data-id="' + esc(u.id) + '">' +
         '<td><div class="tbl__user"><span class="avatar ' + toneClass(u.tone) + '">' + esc(u.name.slice(0, 1)) + "</span>" +
         "<div><strong>" + esc(u.name) + "</strong><span>" + esc(u.phone) + "</span></div></div></td>" +
         "<td>" + planPill(u.plan) + "</td>" +
@@ -469,9 +470,9 @@
         '<td class="num">' + money(u.spend) + "</td>" +
         '<td class="num muted">' + (u.posts || 0) + "</td>" +
         '<td><div class="tbl__acts">' +
-        '<button class="row-btn" type="button" data-act="user:renew" data-id="' + u.id + '">+30 天</button>' +
-        '<button class="row-btn" type="button" data-act="user:open" data-id="' + u.id + '">编辑</button>' +
-        '<button class="row-btn ' + (u.status === "frozen" ? "" : "row-btn--red") + '" type="button" data-act="user:freeze" data-id="' + u.id + '">' +
+        '<button class="row-btn" type="button" data-act="user:renew" data-id="' + esc(u.id) + '">+30 天</button>' +
+        '<button class="row-btn" type="button" data-act="user:open" data-id="' + esc(u.id) + '">编辑</button>' +
+        '<button class="row-btn ' + (u.status === "frozen" ? "" : "row-btn--red") + '" type="button" data-act="user:freeze" data-id="' + esc(u.id) + '">' +
         (u.status === "frozen" ? "解冻" : "冻结") + "</button>" +
         "</div></td></tr>";
     }).join("") : '<tr class="is-static"><td colspan="7"><div class="aempty"><strong>' + (db.users.length ? "没有匹配的用户" : "还没有人注册") + "</strong>" +
@@ -496,12 +497,12 @@
         field("订阅方案", '<select name="plan">' + opts([{ v: "free", t: "体验版" }, { v: "pro", t: "经营者" }, { v: "studio", t: "老板娘" }], u.plan) + "</select>") +
         field("账号状态", '<select name="status">' + opts([{ v: "active", t: "正常" }, { v: "expired", t: "已过期" }, { v: "frozen", t: "已冻结" }], u.status) + "</select>") +
         field("到期日", '<input class="input" type="date" name="expire" value="' + esc(u.expire) + '">') +
-        field("累计消费", '<input class="input" type="number" name="spend" min="0" step="1" value="' + u.spend + '">') +
+        field("累计消费", '<input class="input" type="number" name="spend" min="0" step="1" value="' + esc(u.spend) + '">') +
         field("发帖数", '<input class="input" value="' + (u.posts || 0) + '" readonly>', "", "按真实帖子统计") +
         field("备注", '<textarea name="note" placeholder="内部备注，只有后台可见">' + esc(u.note) + "</textarea>", "full") +
         '<p class="dhint full">到期日留空表示不限；冻结后对方立即被登出，且无法再次登录。</p>' +
         "</form>",
-      foot: (isNew ? "" : '<button class="row-btn row-btn--red" type="button" data-act="user:delete" data-id="' + u.id + '">删除</button>' +
+      foot: (isNew ? "" : '<button class="row-btn row-btn--red" type="button" data-act="user:delete" data-id="' + esc(u.id) + '">删除</button>' +
         '<a class="row-btn" href="profile.html?u=' + encodeURIComponent(u.phone) + '" target="_blank" rel="noopener">查看主页</a>') +
         '<span class="spacer"></span>' +
         '<button class="btn btn--sm btn--ghost" type="button" data-close-drawer>取消</button>' +
@@ -561,9 +562,9 @@
         var n = db.users.filter(function (u) { return u.plan === p.id; }).length;
         return '<div class="plan ' + (p.id === "pro" ? "plan--pro" : "") + '">' +
           '<div class="plan__head"><div><div class="plan__name">' + esc(p.name) + '</div>' +
-          '<div class="plan__id">' + p.id + " / " + (p.active ? "在售" : "已下架") + "</div></div>" +
-          '<button class="row-btn" type="button" data-act="plan:edit" data-id="' + p.id + '">编辑</button></div>' +
-          '<div class="plan__price">' + (p.price ? "¥" + p.price : "免费") + " <small>" + (p.price ? "/ " + esc(p.unit) : "") + "</small></div>" +
+          '<div class="plan__id">' + esc(p.id) + " / " + (p.active ? "在售" : "已下架") + "</div></div>" +
+          '<button class="row-btn" type="button" data-act="plan:edit" data-id="' + esc(p.id) + '">编辑</button></div>' +
+          '<div class="plan__price">' + (p.price ? money(p.price) : "免费") + " <small>" + (p.price ? "/ " + esc(p.unit) : "") + "</small></div>" +
           '<ul class="plan__feats">' + p.features.map(function (f) { return "<li>" + esc(f) + "</li>"; }).join("") + "</ul>" +
           '<div class="plan__foot"><span class="plan__count">' + n + " 位用户</span>" +
           '<span style="margin-left:auto" class="mono">' + (p.active ? "ON" : "OFF") + "</span></div></div>";
@@ -606,12 +607,12 @@
         '<td class="num muted">' + esc(o.createdAt) + "</td>" +
         '<td><div class="tbl__acts">' +
         (o.status === "pending"
-          ? '<button class="row-btn" type="button" data-act="order:paid" data-id="' + o.id + '">标记已付</button>'
+          ? '<button class="row-btn" type="button" data-act="order:paid" data-id="' + esc(o.id) + '">标记已付</button>'
           : o.status === "refund"
-            ? '<button class="row-btn" type="button" data-act="order:paid" data-id="' + o.id + '">重新入账</button>'
+            ? '<button class="row-btn" type="button" data-act="order:paid" data-id="' + esc(o.id) + '">重新入账</button>'
             : "") +
         (o.status !== "refund"
-          ? '<button class="row-btn row-btn--red" type="button" data-act="order:refund" data-id="' + o.id + '">退款</button>'
+          ? '<button class="row-btn row-btn--red" type="button" data-act="order:refund" data-id="' + esc(o.id) + '">退款</button>'
           : "") +
         "</div></td></tr>";
     }).join("") : '<tr class="is-static"><td colspan="8"><div class="aempty"><strong>没有订单</strong>换个状态筛选看看。</div></td></tr>';
@@ -627,7 +628,7 @@
       sub: "价格与权益会同步到前台定价区。",
       body: '<form id="drawerForm" class="dgrid">' +
         field("方案名称", '<input class="input" name="name" value="' + esc(p.name) + '" required>', "full") +
-        field("价格（元）", '<input class="input" type="number" name="price" min="0" step="1" value="' + p.price + '">') +
+        field("价格（元）", '<input class="input" type="number" name="price" min="0" step="1" value="' + esc(p.price) + '">') +
         field("计价单位", '<input class="input" name="unit" value="' + esc(p.unit) + '">') +
         field("一句话描述", '<input class="input" name="desc" value="' + esc(p.desc) + '">', "full") +
         field("权益（每行一条）", '<textarea name="features" style="min-height:130px">' + esc(p.features.join("\n")) + "</textarea>", "full") +
@@ -661,7 +662,7 @@
       title: "开通 / 续费",
       sub: "线下收款、赠送或补单，都在这里生成一条已支付订单。",
       body: field("选择用户", '<select name="userId">' + opts(userOpts, userOpts[0].v) + "</select>", "full") +
-        field("订阅方案", '<select name="plan">' + opts(db.plans.map(function (p) { return { v: p.id, t: p.name + " · ¥" + p.price + "/" + p.unit }; }), "pro") + "</select>") +
+        field("订阅方案", '<select name="plan">' + opts(db.plans.map(function (p) { return { v: p.id, t: p.name + " · ¥" + esc(p.price) + "/" + p.unit }; }), "pro") + "</select>") +
         field("时长（月）", '<input class="input" type="number" name="months" value="1" min="1" max="36">') +
         field("支付方式", '<select name="method">' + opts([{ v: "alipay", t: "支付宝" }, { v: "wechat", t: "微信支付" }, { v: "bank", t: "对公转账" }, { v: "manual", t: "线下/赠送" }], "alipay") + "</select>") +
         field("实收金额", '<input class="input" type="number" name="amount" value="399" min="0" step="1">') +
@@ -720,8 +721,8 @@
 
   function statline(items) {
     return '<div class="statline">' + items.map(function (it) {
-      return '<div class="statline__item"><span>' + it[0] + "</span><b>" + it[1] + "</b>" +
-        (it[2] ? "<em>" + it[2] + "</em>" : "") + "</div>";
+      return '<div class="statline__item"><span>' + esc(it[0]) + "</span><b>" + esc(it[1]) + "</b>" +
+        (it[2] ? "<em>" + esc(it[2]) + "</em>" : "") + "</div>";
     }).join("") + "</div>";
   }
 
@@ -827,8 +828,8 @@
     $("#mBody").innerHTML = rows.length ? rows.map(function (m) {
       var expLeft = DB.daysLeft(m.certExpire);
       var certCls = m.verified && expLeft !== null && expLeft <= 30 ? "color:var(--red);font-weight:600" : "";
-      return '<tr data-act="m:open" data-id="' + m.id + '">' +
-        '<td class="cbx-c"><input class="cbx" type="checkbox" data-sel="merchants" value="' + m.id + '"' +
+      return '<tr data-act="m:open" data-id="' + esc(m.id) + '">' +
+        '<td class="cbx-c"><input class="cbx" type="checkbox" data-sel="merchants" value="' + esc(m.id) + '"' +
         (isSel("merchants", m.id) ? " checked" : "") + ' aria-label="选择 ' + esc(m.name) + '"></td>' +
         '<td class="num strong">' + esc(m.stall) +
         '<div class="muted" style="font-size:9px;letter-spacing:.08em">' + esc(m.id) + "</div></td>" +
@@ -847,11 +848,11 @@
         '<td class="num muted">' + (m.leads || 0) + "</td>" +
         '<td><div class="tbl__acts">' +
         (m.status === "pending"
-          ? '<button class="row-btn" type="button" data-act="m:approve" data-id="' + m.id + '">通过</button>' +
-            '<button class="row-btn row-btn--red" type="button" data-act="m:reject" data-id="' + m.id + '">拒绝</button>'
-          : '<button class="row-btn" type="button" data-act="m:feature" data-id="' + m.id + '">' +
+          ? '<button class="row-btn" type="button" data-act="m:approve" data-id="' + esc(m.id) + '">通过</button>' +
+            '<button class="row-btn row-btn--red" type="button" data-act="m:reject" data-id="' + esc(m.id) + '">拒绝</button>'
+          : '<button class="row-btn" type="button" data-act="m:feature" data-id="' + esc(m.id) + '">' +
             (m.featured ? "取消推荐" : "推荐") + "</button>") +
-        '<button class="row-btn" type="button" data-act="m:open" data-id="' + m.id + '">编辑</button>' +
+        '<button class="row-btn" type="button" data-act="m:open" data-id="' + esc(m.id) + '">编辑</button>' +
         "</div></td></tr>";
     }).join("") : '<tr class="is-static"><td colspan="9"><div class="aempty"><strong>没有匹配的商家</strong>换个区域或状态看看。</div></td></tr>';
 
@@ -890,7 +891,7 @@
       field("起订量", '<input class="input" name="minOrder" value="' + esc(m.minOrder) + '">') +
       field("发货 / 交付时效", '<input class="input" name="leadTime" value="' + esc(m.leadTime) + '">') +
       field("营业时间", '<input class="input" name="hours" value="' + esc(m.hours) + '">') +
-      field("排序权重", '<input class="input" type="number" name="weight" min="0" max="999" value="' + m.weight + '">') +
+      field("排序权重", '<input class="input" type="number" name="weight" min="0" max="999" value="' + esc(m.weight) + '">') +
       field("首页推荐位", '<select name="featured">' + opts([{ v: "1", t: "推荐到首页" }, { v: "0", t: "不推荐" }], m.featured ? "1" : "0") + "</select>") +
       field("前台展示", '<select name="status">' + opts([{ v: "approved", t: "已通过（前台可见）" }, { v: "pending", t: "待审核（不可见）" }, { v: "rejected", t: "已拒绝" }], m.status) + "</select>") +
       "</div>";
@@ -921,7 +922,7 @@
         dtabs([{ v: "basic", t: "基本资料" }, { v: "biz", t: "经营与展示" }, { v: "cert", t: "认证与审核" }, { v: "data", t: "数据" }]) +
         pane("basic", basic, true) + pane("biz", biz) + pane("cert", cert) + pane("data", data) +
         "</form>",
-      foot: (isNew ? "" : '<button class="row-btn row-btn--red" type="button" data-act="m:delete" data-id="' + m.id + '">删除</button>') +
+      foot: (isNew ? "" : '<button class="row-btn row-btn--red" type="button" data-act="m:delete" data-id="' + esc(m.id) + '">删除</button>') +
         '<span class="spacer"></span>' +
         '<button class="btn btn--sm btn--ghost" type="button" data-close-drawer>取消</button>' +
         '<button class="btn btn--sm btn--red" type="submit" form="drawerForm">保存</button>',
@@ -1018,8 +1019,8 @@
     });
 
     $("#pBody").innerHTML = rows.length ? rows.map(function (p) {
-      return '<tr data-act="p:open" data-id="' + p.id + '">' +
-        '<td class="cbx-c"><input class="cbx" type="checkbox" data-sel="products" value="' + p.id + '"' +
+      return '<tr data-act="p:open" data-id="' + esc(p.id) + '">' +
+        '<td class="cbx-c"><input class="cbx" type="checkbox" data-sel="products" value="' + esc(p.id) + '"' +
         (isSel("products", p.id) ? " checked" : "") + ' aria-label="选择 ' + esc(p.name) + '"></td>' +
         '<td class="num muted">' + esc(p.id) + "</td>" +
         '<td class="strong">' + esc(p.name) +
@@ -1031,8 +1032,8 @@
         '<td class="num muted">' + Number(p.sales || 0).toLocaleString("zh-CN") + "</td>" +
         "<td>" + (p.status === "on" ? '<span class="pill pill--ok">已上架</span>' : '<span class="pill pill--mute">已下架</span>') + "</td>" +
         '<td><div class="tbl__acts">' +
-        '<button class="row-btn" type="button" data-act="p:toggle" data-id="' + p.id + '">' + (p.status === "on" ? "下架" : "上架") + "</button>" +
-        '<button class="row-btn" type="button" data-act="p:feature" data-id="' + p.id + '">' + (p.featured ? "取消推荐" : "推荐") + "</button>" +
+        '<button class="row-btn" type="button" data-act="p:toggle" data-id="' + esc(p.id) + '">' + (p.status === "on" ? "下架" : "上架") + "</button>" +
+        '<button class="row-btn" type="button" data-act="p:feature" data-id="' + esc(p.id) + '">' + (p.featured ? "取消推荐" : "推荐") + "</button>" +
         "</div></td></tr>";
     }).join("") : '<tr class="is-static"><td colspan="9"><div class="aempty"><strong>没有匹配的工具</strong>换个品类或状态看看。</div></td></tr>';
 
@@ -1069,15 +1070,15 @@
       "</div>";
 
     var pricing = '<div class="dgrid">' +
-      field("价格（元）", '<input class="input" type="number" name="price" min="0" step="0.1" value="' + p.price + '">') +
+      field("价格（元）", '<input class="input" type="number" name="price" min="0" step="0.1" value="' + esc(p.price) + '">') +
       field("计价单位", '<input class="input" name="unit" value="' + esc(p.unit) + '" placeholder="如 月 / 条 / 张">') +
       field("计费方式", '<select name="billing">' + opts([
         { v: "monthly", t: "按月订阅" }, { v: "yearly", t: "按年订阅" },
         { v: "per-unit", t: "按次计费" }, { v: "free", t: "免费 / 内测" }
       ], p.billing) + "</select>") +
-      field("试用天数", '<input class="input" type="number" name="trial" min="0" max="90" value="' + p.trial + '">') +
-      field("平台抽成（%）", '<input class="input" type="number" name="commission" min="0" max="100" step="1" value="' + p.commission + '">') +
-      field("对客展示价", '<input class="input" value="' + (p.price ? "¥" + p.price + " / " + p.unit : "免费") + '" disabled>') +
+      field("试用天数", '<input class="input" type="number" name="trial" min="0" max="90" value="' + esc(p.trial) + '">') +
+      field("平台抽成（%）", '<input class="input" type="number" name="commission" min="0" max="100" step="1" value="' + esc(p.commission) + '">') +
+      field("对客展示价", '<input class="input" value="' + (p.price ? "¥" + esc(p.price) + " / " + esc(p.unit) : "免费") + '" disabled>') +
       '<p class="dhint full">抽成用于结算记录；展示价由价格与单位自动拼出，不用单独维护。</p>' +
       "</div>";
 
@@ -1092,7 +1093,7 @@
         { v: "", t: "无" }, { v: "热门", t: "热门" }, { v: "新上", t: "新上" },
         { v: "内测", t: "内测" }, { v: "限量", t: "限量" }
       ], p.badge) + "</select>") +
-      field("排序权重", '<input class="input" type="number" name="weight" min="0" max="999" value="' + p.weight + '">') +
+      field("排序权重", '<input class="input" type="number" name="weight" min="0" max="999" value="' + esc(p.weight) + '">') +
       field("上架状态", '<select name="status">' + opts([{ v: "on", t: "已上架" }, { v: "off", t: "已下架" }], p.status) + "</select>") +
       field("首页推荐", '<select name="featured">' + opts([{ v: "1", t: "推荐" }, { v: "0", t: "不推荐" }], p.featured ? "1" : "0") + "</select>") +
       "</div>";
@@ -1104,8 +1105,8 @@
       '<div><span>最近更新</span><b>' + esc(p.updated || "—") + "</b></div>" +
       "</div>" +
       '<div class="dgrid" style="margin-top:12px">' +
-      field("手工修正销量", '<input class="input" type="number" name="sales" min="0" step="1" value="' + p.sales + '">') +
-      field("收入（元）", '<input class="input" type="number" name="revenue" min="0" step="1" value="' + p.revenue + '">') +
+      field("手工修正销量", '<input class="input" type="number" name="sales" min="0" step="1" value="' + esc(p.sales) + '">') +
+      field("收入（元）", '<input class="input" type="number" name="revenue" min="0" step="1" value="' + esc(p.revenue) + '">') +
       '<p class="dhint full">销量与收入用于后台报表；真实环境应由订单流水汇总。</p>' +
       "</div>";
 
@@ -1118,7 +1119,7 @@
         dtabs([{ v: "basic", t: "基本资料" }, { v: "pricing", t: "定价与计费" }, { v: "delivery", t: "交付与展示" }, { v: "data", t: "数据" }]) +
         pane("basic", basic, true) + pane("pricing", pricing) + pane("delivery", delivery) + pane("data", data) +
         "</form>",
-      foot: (isNew ? "" : '<button class="row-btn row-btn--red" type="button" data-act="p:delete" data-id="' + p.id + '">删除</button>') +
+      foot: (isNew ? "" : '<button class="row-btn row-btn--red" type="button" data-act="p:delete" data-id="' + esc(p.id) + '">删除</button>') +
         '<span class="spacer"></span>' +
         '<button class="btn btn--sm btn--ghost" type="button" data-close-drawer>取消</button>' +
         '<button class="btn btn--sm btn--red" type="submit" form="drawerForm">保存</button>',
@@ -1136,6 +1137,10 @@
         };
         if (isNew) {
           patch.id = d.pid.trim() || DB.nextId("AI", db.products);
+          if (!/^[A-Za-z0-9_-]{1,64}$/.test(patch.id) || ["__proto__", "constructor", "prototype"].includes(patch.id)) {
+            toast("品号仅支持 1–64 位字母、数字、下划线或减号"); return;
+          }
+          if (db.products.some(function (item) { return item.id === patch.id; })) { toast("品号已存在"); return; }
           db.products.unshift(patch);
           toast("已上架新工具");
         } else {
@@ -1237,7 +1242,7 @@
     });
 
     $("#aBody").innerHTML = rows.length ? rows.map(function (a) {
-      return '<tr data-act="a:open" data-id="' + a.id + '">' +
+      return '<tr data-act="a:open" data-id="' + esc(a.id) + '">' +
         '<td class="strong" style="white-space:normal;max-width:330px">' + esc(a.title) + "</td>" +
         '<td><span class="tag" style="height:19px;font-size:9px">' + esc(a.type) + "</span></td>" +
         '<td class="muted">' + esc(a.source) + "</td>" +
@@ -1245,8 +1250,8 @@
         "<td>" + (a.pinned ? '<span class="pill pill--red">置顶</span>' : '<span class="pill pill--mute">—</span>') + "</td>" +
         '<td class="num muted">' + esc(a.date) + "</td>" +
         '<td><div class="tbl__acts">' +
-        '<button class="row-btn" type="button" data-act="a:toggle" data-id="' + a.id + '">' + (a.status === "published" ? "转草稿" : "发布") + "</button>" +
-        '<button class="row-btn" type="button" data-act="a:pin" data-id="' + a.id + '">' + (a.pinned ? "取消置顶" : "置顶") + "</button>" +
+        '<button class="row-btn" type="button" data-act="a:toggle" data-id="' + esc(a.id) + '">' + (a.status === "published" ? "转草稿" : "发布") + "</button>" +
+        '<button class="row-btn" type="button" data-act="a:pin" data-id="' + esc(a.id) + '">' + (a.pinned ? "取消置顶" : "置顶") + "</button>" +
         "</div></td></tr>";
     }).join("") : '<tr class="is-static"><td colspan="7"><div class="aempty"><strong>没有匹配的内容</strong>换个类型或状态看看。</div></td></tr>';
 
@@ -1274,7 +1279,7 @@
         field("摘要", '<textarea name="summary" style="min-height:88px" placeholder="两句话说明这条政策影响什么">' + esc(a.summary) + "</textarea>", "full") +
         field("正文（可选）", '<textarea name="body" style="min-height:110px" placeholder="详细解读，可留空">' + esc(a.body) + "</textarea>", "full") +
         "</div>",
-      foot: (isNew ? "" : '<button class="row-btn row-btn--red" type="button" data-act="a:delete" data-id="' + a.id + '">删除</button>') +
+      foot: (isNew ? "" : '<button class="row-btn row-btn--red" type="button" data-act="a:delete" data-id="' + esc(a.id) + '">删除</button>') +
         '<span style="flex:1"></span>' +
         '<button class="btn btn--sm btn--ghost" type="button" data-close-modal>取消</button>' +
         '<button class="btn btn--sm btn--red" type="submit" form="modalForm">保存</button>',
@@ -1340,18 +1345,18 @@
         (p.body ? '<div class="muted" style="font-weight:400;font-size:12px;margin-top:2px">' + esc(String(p.body).slice(0, 60)) + (String(p.body).length > 60 ? "…" : "") + "</div>" : "") + "</td>" +
         '<td class="muted">' + esc(p.author) + "</td>" +
         '<td><span class="tag" style="height:19px;font-size:9px">' + esc(p.tag) + "</span></td>" +
-        '<td class="num muted">' + p.likes + " / " + p.comments + "</td>" +
+        '<td class="num muted">' + esc(p.likes) + " / " + esc(p.comments) + "</td>" +
         "<td>" + (p.status === "reported"
-          ? '<span class="pill pill--red">被举报 ' + p.reports + "</span>"
+          ? '<span class="pill pill--red">被举报 ' + esc(p.reports) + "</span>"
           : p.status === "hidden"
             ? '<span class="pill pill--mute">已隐藏</span>'
             : '<span class="pill pill--ok">正常</span>') + "</td>" +
         '<td class="num muted">' + esc(p.date) + "</td>" +
         '<td><div class="tbl__acts">' +
         (p.status === "hidden"
-          ? '<button class="row-btn" type="button" data-act="post:show" data-id="' + p.id + '">恢复</button>'
-          : '<button class="row-btn" type="button" data-act="post:hide" data-id="' + p.id + '">隐藏</button>') +
-        '<button class="row-btn row-btn--red" type="button" data-act="post:delete" data-id="' + p.id + '">删除</button>' +
+          ? '<button class="row-btn" type="button" data-act="post:show" data-id="' + esc(p.id) + '">恢复</button>'
+          : '<button class="row-btn" type="button" data-act="post:hide" data-id="' + esc(p.id) + '">隐藏</button>') +
+        '<button class="row-btn row-btn--red" type="button" data-act="post:delete" data-id="' + esc(p.id) + '">删除</button>' +
         "</div></td></tr>";
     }).join("") : '<tr class="is-static"><td colspan="7"><div class="aempty"><strong>' + (db.posts.length ? "没有匹配的帖子" : "社区里还没有圈友发帖") + "</strong>" +
       (db.posts.length ? "换个状态看看。" : "圈友在前台发帖后会出现在这里。") + "</div></td></tr>";
@@ -1396,20 +1401,17 @@
      SETTINGS
      ====================================================================== */
   function accountPanel() {
-    var acc = DB.account || { user: "admin", name: "管理员", source: "default" };
+    var acc = DB.account || { user: "", name: "管理员" };
     if (acc.source === "env") {
       return '<div class="crow-note"><p class="dhint">当前账号 <b>' + esc(acc.user) + "</b> 由服务器环境变量 ADMIN_USER / ADMIN_PASS 管理，" +
         "需要在服务器上修改后重启服务。</p></div>";
     }
     return '<form id="accountForm" class="dgrid" autocomplete="off">' +
-      (acc.source === "default"
-        ? '<p class="dhint full" style="color:var(--red);font-weight:600">正在使用默认账号 admin / ywai2026，任何人都可能猜到，请立即设置新密码。</p>'
-        : "") +
       field("登录账号", '<input class="input" name="user" value="' + esc(acc.user) + '" autocomplete="username">') +
       field("显示名称", '<input class="input" name="name" value="' + esc(acc.name) + '">') +
       field("当前密码", '<input class="input" type="password" name="current" autocomplete="current-password" required>', "full") +
       field("新密码", '<input class="input" type="password" name="pass" autocomplete="new-password" placeholder="' +
-        (acc.source === "default" ? "必须设置" : "留空则不修改") + '">', "full", "至少 10 位，同时包含字母和数字") +
+        "留空则不修改" + '">', "full", "至少 10 位，同时包含字母和数字") +
       '<div class="full" style="display:flex;justify-content:flex-end;gap:8px;align-items:center">' +
       '<span class="dhint" style="margin-right:auto">保存后其他设备上的后台登录会全部失效。</span>' +
       '<button class="btn btn--sm btn--red" type="submit">更新账号</button></div></form>';
@@ -1449,7 +1451,7 @@
         field("支付宝账号", '<input class="input" name="payAlipay" value="' + esc(s.pay.alipay) + '">') +
         field("微信收款号", '<input class="input" name="payWechat" value="' + esc(s.pay.wechat) + '">') +
         field("对公账户", '<input class="input" name="payBank" value="' + esc(s.pay.bank) + '">', "full") +
-        field("试用天数", '<input class="input" type="number" name="trialDays" min="0" value="' + s.pay.trialDays + '">') +
+        field("试用天数", '<input class="input" type="number" name="trialDays" min="0" value="' + esc(s.pay.trialDays) + '">') +
         field("自动续费默认", '<select name="autoRenew">' + opts([{ v: "1", t: "开启" }, { v: "0", t: "关闭" }], s.pay.autoRenew ? "1" : "0") + "</select>") +
         '</div><p class="dhint" style="margin-top:12px">演示环境不发起真实扣款，订单在「方案与订单」里手动标记。</p></div></div>' +
 
@@ -1475,9 +1477,9 @@
         '<div class="panel"><div class="panel__head"><div class="panel__title">数据</div>' +
         '<span class="mono" style="color:var(--ink-40)">数据管理</span></div>' +
         '<div class="panel__body" style="display:grid;gap:10px">' +
-        '<button class="btn btn--ghost btn--sm" type="button" data-act="data:export">导出 JSON 备份</button>' +
+        '<button class="btn btn--ghost btn--sm" type="button" data-act="data:export">导出脱敏 JSON</button>' +
         '<button class="btn btn--ghost btn--sm" type="button" data-act="data:clear-demo">清空演示订单与统计</button>' +
-        '<button class="btn btn--ghost btn--sm" type="button" data-act="data:reset">恢复初始内容</button>' +
+        (DB.demoAllowed() ? '<button class="btn btn--ghost btn--sm" type="button" data-act="data:reset">恢复初始内容</button>' : "") +
         '<p class="dhint">数据保存在服务器（data/db.json），修改后自动同步。' +
         (DB.live ? "当前真实注册用户 " + DB.live.users + " 人，社区发帖 " + DB.live.posts + " 条，待处理认证申请 " + DB.live.applications + " 份。" : "") + "</p>" +
         "</div></div>" +
@@ -1799,12 +1801,15 @@
       }
 
       case "data:export": {
-        var blob = new Blob([JSON.stringify(db, null, 2)], { type: "application/json" });
+        var blob = new Blob([JSON.stringify(db, function (key, value) {
+          return ["phone", "wechat", "license", "alipay", "bank", "pass", "pwHash"].includes(key) ? "" : value;
+        }, 2)], { type: "application/json" });
         var a2 = document.createElement("a");
         a2.href = URL.createObjectURL(blob);
         a2.download = "ywai-admin-db-" + DB.addDays("", 0) + ".json";
         a2.click();
-        toast("已导出备份");
+        toast("已导出脱敏数据");
+        setTimeout(function () { URL.revokeObjectURL(a2.href); }, 1000);
         break;
       }
       case "data:clear-demo": {
@@ -1820,13 +1825,15 @@
           kicker: "危险操作",
           title: "恢复初始内容？",
           sub: "商家、AI 工具、资讯、方案和订单会回到初始内容，你的修改会被覆盖。真实用户、帖子和认证申请不受影响。",
-          body: '<p class="dhint">导出备份后再重置会更稳妥。</p>',
+          body: '<p class="dhint">如需保留完整数据，请先备份服务器数据目录。</p>',
           foot: '<button class="btn btn--sm btn--ghost" type="button" data-close-modal>取消</button>' +
             '<button class="btn btn--sm btn--red" type="button" data-act="data:reset-confirm">确认重置</button>'
         });
         break;
       }
-      case "data:reset-confirm": DB.reset().then(function () { closeModal(); render(); toast("已恢复初始内容"); }); break;
+      case "data:reset-confirm": DB.reset().then(function (r) {
+        if (r.ok) { closeModal(); render(); toast("已恢复初始内容"); }
+      }); break;
     }
   });
 
@@ -1850,8 +1857,7 @@
       btn.disabled = false;
       if (!r.ok) { toast(r.message || "保存失败"); return; }
       paintWho();
-      paintDefaultWarning();
-      render();
+        render();
       toast("账号已更新，其他设备需要重新登录");
     });
   });
@@ -1876,7 +1882,7 @@
       s.toggles[k] = d["t_" + k] === "1";
     });
     DB.save();
-    toast("设置已保存");
+    toast("正在提交设置");
     render();
   });
 
@@ -1899,37 +1905,29 @@
     av.textContent = (acc.name || "管").slice(0, 1);
   }
 
-  function paintDefaultWarning() {
-    var bar = document.getElementById("defaultWarn");
-    var on = DB.account && DB.account.isDefault;
-    if (!on) { if (bar) bar.remove(); return; }
-    if (bar) return;
-    bar = document.createElement("div");
-    bar.id = "defaultWarn";
-    bar.className = "warnbar";
-    bar.innerHTML = "<b>安全提醒</b><span>后台仍在使用默认账号密码，任何人都可能登录。请到「站点设置 → 管理员账号」立即修改。</span>" +
-      '<a href="#/settings">去修改 →</a>';
-    viewEl.parentNode.insertBefore(bar, viewEl);
-  }
-
   var syncEl = document.getElementById("syncState");
-  var SYNC_TEXT = { pending: "有未保存的修改", saving: "保存中…", saved: "已保存", loaded: "已同步", error: "保存失败", conflict: "已加载最新版本", expired: "登录已过期" };
+  var SYNC_TEXT = { pending: "有未保存的修改", saving: "保存中…", saved: "已保存", loaded: "已同步", error: "保存失败", conflict: "请刷新后核对数据", expired: "登录已过期" };
   DB.onSync(function (st, detail) {
+    if (st !== "pending") {
+      var locked = ["saving", "conflict", "expired"].includes(st);
+      viewEl.inert = locked;
+      drawer.inert = locked;
+      modal.inert = locked;
+    }
     if (syncEl) {
       syncEl.textContent = SYNC_TEXT[st] || "";
       syncEl.dataset.state = st;
     }
-    if (st === "conflict") { render(); toast(detail || "其他管理员刚刚修改过数据，已加载最新版本，请重新操作"); }
+    if (st === "conflict") toast(detail || "其他管理员刚刚修改过数据，请刷新后重新应用修改");
     if (st === "error") toast(detail || "同步到服务器失败，请检查网络");
     if (st === "expired") { toast("后台登录已过期，请重新登录"); setTimeout(function () { location.reload(); }, 1200); }
-    if (st === "saved" && DB.live) renderNav();
+    if (st === "saved" || (st === "error" && DB.isOnline())) render();
   });
 
   function showApp() {
     gate.style.display = "none";
     app.hidden = false;
     paintWho();
-    paintDefaultWarning();
     if (!location.hash) location.hash = "#/dashboard";
     render();
   }
@@ -1951,16 +1949,17 @@
     gateBtn.disabled = true;
     gateBtn.textContent = "核对中…";
     DB.login(u, p).then(function (r) {
-      if (r.ok) return DB.pull().then(function () { return r; });
+      if (r.ok) return DB.pull();
       return r;
     }).then(function (r) {
       gateBtn.disabled = false;
       gateBtn.textContent = "进入后台";
       if (r.ok) {
         gateErr.classList.remove("is-on");
+        gatePass.value = "";
         showApp();
         toast("欢迎回来，" + ((DB.account && DB.account.name) || "管理员"));
-      } else if (r.status === 429 || r.status === 0) {
+      } else if (r.error !== "bad_credentials") {
         gateErr.textContent = r.message || "请稍后再试";
         gateErr.classList.add("is-on");
       } else {
@@ -1983,7 +1982,10 @@
 
   document.getElementById("sideOut").addEventListener("click", function () {
     localStorage.removeItem(SKEY);
-    DB.logout().then(function () { location.reload(); });
+    DB.logout().then(function (r) {
+      if (r.ok) location.reload();
+      else toast(r.message || "退出失败，请重试");
+    });
   });
 
 

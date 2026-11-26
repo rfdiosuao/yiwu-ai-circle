@@ -12,6 +12,8 @@ const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
+const net = require("node:net");
+const { validAdminDoc, validMerchant } = require("./lib/admin-document");
 const { createStore } = require("./lib/store");
 const adminSeed = require("./lib/admin-seed");
 
@@ -38,7 +40,13 @@ function conf(name) {
 }
 
 const PORT = Number(conf("PORT") || 8000);
-const HOST = conf("HOST") || "0.0.0.0";
+const HOST = conf("HOST") || "127.0.0.1";
+const NODE_ENV = (conf("NODE_ENV") || "development").toLowerCase();
+const IS_PRODUCTION = NODE_ENV === "production";
+const TRUST_PROXY = conf("TRUST_PROXY") === "1";
+const TRUSTED_PROXY_IPS = new Set((conf("TRUSTED_PROXY_IPS") || "127.0.0.1,::1").split(",").map(normalizeIp));
+function normalizeIp(ip) { return String(ip).trim().replace(/^::ffff:/, ""); }
+function trustedProxy(req) { return TRUST_PROXY && TRUSTED_PROXY_IPS.has(normalizeIp(req.socket.remoteAddress)); }
 
 /* 静态目录：显式配置优先；否则有 public/ 用 public/，没有就用项目根目录。 */
 const STATIC_DIR = path.resolve(
@@ -56,6 +64,7 @@ const store = createStore(DATA_DIR);
 const db = function () { return store.data; };
 
 /* 会话密钥：未配置时生成一次并写入数据目录，保证重启后登录态仍有效。 */
+const SESSION_SECRET_CONFIGURED = Boolean(conf("SESSION_SECRET"));
 const SESSION_SECRET = conf("SESSION_SECRET") || (function () {
   const file = path.join(DATA_DIR, ".session-secret");
   try {
@@ -73,10 +82,11 @@ const SHORT_TTL_SECONDS = 12 * 3600;
 const ADMIN_TTL_SECONDS = 8 * 3600;
 const COOKIE_NAME = "ywai_sid";
 const ADMIN_COOKIE = "ywai_admin";
+const adminSessions = new Map();
 /* COOKIE_SECURE：1 强制 Secure，0 关闭，留空则按请求是否 HTTPS 自动判断。 */
-const COOKIE_SECURE = conf("COOKIE_SECURE");
+const COOKIE_SECURE = conf("COOKIE_SECURE") || (IS_PRODUCTION ? "1" : "");
 
-const SMS_MODE = (conf("SMS_MODE") || "demo").toLowerCase();
+const SMS_MODE = (conf("SMS_MODE") || (IS_PRODUCTION ? "api" : "demo")).toLowerCase();
 const DEMO_CODE = conf("DEMO_CODE");
 const SMS_SEND_URL = conf("SMS_SEND_URL").trim();
 const SMS_VERIFY_URL = conf("SMS_VERIFY_URL").trim();
@@ -122,22 +132,27 @@ function readBody(req, limit) {
   const max = limit || 65536;
   return new Promise(function (resolve, reject) {
     let size = 0;
+    let exceeded = false;
     const chunks = [];
     req.on("data", function (chunk) {
+      if (exceeded) return;
       size += chunk.length;
       if (size > max) {
+        exceeded = true;
+        chunks.length = 0;
         reject(new Error("body_too_large"));
-        req.destroy();
         return;
       }
       chunks.push(chunk);
     });
     req.on("end", function () {
+      if (exceeded) return;
       const raw = Buffer.concat(chunks).toString("utf8");
       if (!raw) return resolve({});
       try {
         const parsed = JSON.parse(raw);
-        resolve(parsed && typeof parsed === "object" ? parsed : {});
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return reject(new Error("invalid_json"));
+        resolve(parsed);
       } catch (err) {
         reject(new Error("invalid_json"));
       }
@@ -166,7 +181,7 @@ function setCookie(res, name, value, maxAge) {
   const parts = [name + "=" + encodeURIComponent(value), "Path=/", "HttpOnly", "SameSite=Lax"];
   if (maxAge !== null) parts.push("Max-Age=" + maxAge);
   const req = res.req;
-  const https = Boolean(req && (req.socket.encrypted || String(req.headers["x-forwarded-proto"] || "").indexOf("https") === 0));
+  const https = Boolean(req && (req.socket.encrypted || (trustedProxy(req) && String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim() === "https")));
   if (COOKIE_SECURE === "1" || (COOKIE_SECURE !== "0" && https)) parts.push("Secure");
   const prev = res.getHeader("Set-Cookie");
   const list = prev ? [].concat(prev) : [];
@@ -194,8 +209,8 @@ function unsign(token, ttlSeconds) {
   } catch (err) {
     return null;
   }
-  if (!data || !data.i) return null;
-  if (Date.now() - Number(data.i) > ttlSeconds * 1000) return null;
+  if (!data || !Number.isSafeInteger(data.i) || data.i > Date.now() || data.i <= 0) return null;
+  if (Date.now() - data.i > ttlSeconds * 1000) return null;
   return data;
 }
 
@@ -208,9 +223,14 @@ function hashPassword(pw) {
 function checkPassword(pw, stored) {
   if (!stored || stored.indexOf("scrypt$") !== 0) return false;
   const parts = stored.split("$");
-  const key = crypto.scryptSync(String(pw), Buffer.from(parts[1], "hex"), 32);
-  const expect = Buffer.from(parts[2], "hex");
-  return key.length === expect.length && crypto.timingSafeEqual(key, expect);
+  if (parts.length !== 3 || !/^[0-9a-f]{32}$/.test(parts[1]) || !/^[0-9a-f]{64}$/.test(parts[2])) return false;
+  try {
+    const key = crypto.scryptSync(String(pw), Buffer.from(parts[1], "hex"), 32);
+    const expect = Buffer.from(parts[2], "hex");
+    return key.length === expect.length && crypto.timingSafeEqual(key, expect);
+  } catch (err) {
+    return false;
+  }
 }
 
 function safeEqual(a, b) {
@@ -242,7 +262,13 @@ function str(v, max) {
 }
 
 function clientIp(req) {
-  return String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+  const direct = normalizeIp(req.socket.remoteAddress || "");
+  if (!trustedProxy(req)) return direct;
+  const forwarded = String(req.headers["x-forwarded-for"] || "").split(",").map(normalizeIp);
+  if (!forwarded.length || !forwarded.every(ip => net.isIP(ip))) return direct;
+  const chain = forwarded.concat(direct);
+  while (chain.length > 1 && TRUSTED_PROXY_IPS.has(chain[chain.length - 1])) chain.pop();
+  return chain[chain.length - 1];
 }
 
 /* 简单的内存限流：key -> [时间戳] */
@@ -260,6 +286,8 @@ function rateLimited(key, max, windowMs) {
 }
 setInterval(function () {
   const now = Date.now();
+  adminSessions.forEach((expires, id) => { if (expires <= now) adminSessions.delete(id); });
+  otps.forEach((entry, phone) => { if (entry.exp <= now) otps.delete(phone); });
   hits.forEach(function (list, key) {
     if (!list.length || now - list[list.length - 1] > 3600e3) hits.delete(key);
   });
@@ -321,11 +349,23 @@ function guardOf(phone) {
   return guards.get(phone) || { code: 0, pw: 0, lockUntil: 0 };
 }
 
+function invalidCode(res, phone, message) {
+  const guard = guardOf(phone);
+  const fails = (guard.code || 0) + 1;
+  if (fails >= 5) {
+    guards.set(phone, Object.assign({}, guard, { code: 0, lockUntil: Date.now() + 60e3 }));
+    return fail(res, 429, "locked", "连续 5 次输入错误，已锁定 60 秒");
+  }
+  guards.set(phone, Object.assign({}, guard, { code: fails }));
+  return fail(res, 401, "invalid_code", message || ("验证码不正确，还可尝试 " + (5 - fails) + " 次"));
+}
+
 async function postForm(url, fields) {
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams(fields).toString()
+    body: new URLSearchParams(fields).toString(),
+    signal: AbortSignal.timeout(10000)
   });
   const text = await res.text();
   let data = null;
@@ -342,7 +382,8 @@ async function fetchAccess(userId) {
     res = await fetch(WAG_BASE_URL + "/v1/entitlements/access", {
       method: "POST",
       headers: { "Authorization": "Bearer " + WAG_API_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ entitlement_id: WAG_ENTITLEMENT_ID, user_id: userId })
+      body: JSON.stringify({ entitlement_id: WAG_ENTITLEMENT_ID, user_id: userId }),
+      signal: AbortSignal.timeout(10000)
     });
   } catch (err) {
     return { ok: false, code: "payment_unreachable" };
@@ -352,9 +393,17 @@ async function fetchAccess(userId) {
   if (res.status < 200 || res.status >= 300 || !data) {
     return { ok: false, code: "payment_unavailable", status: res.status };
   }
-  const purchase = data.purchase && data.purchase.url
-    ? { url: data.purchase.url, qrCodeUrl: data.purchase.qr_code_url || "" }
-    : null;
+  const externalUrl = function (value) {
+    try {
+      const u = new URL(String(value));
+      return u.protocol === "https:" || u.protocol === "http:" ? u.toString() : "";
+    } catch (err) {
+      return "";
+    }
+  };
+  const purchaseUrl = data.purchase && externalUrl(data.purchase.url);
+  const qrCodeUrl = data.purchase && externalUrl(data.purchase.qr_code_url);
+  const purchase = purchaseUrl ? { url: purchaseUrl, qrCodeUrl: qrCodeUrl } : null;
   return {
     ok: true,
     access: data.access || "unavailable",
@@ -366,7 +415,16 @@ async function fetchAccess(userId) {
 
 /* ------------------------------------------------------------- 社区数据 */
 
-const POST_ID = /^[A-Za-z0-9_-]{1,40}$/;
+// The public community page also renders nine built-in posts.
+function publicPostIds() {
+  return new Set(db().posts.filter(p => !p.hidden).map(p => p.id).concat(
+    Array.from({ length: 9 }, (_, index) => "p" + index)
+  ));
+}
+
+function canInteractWithPost(id) {
+  return /^p[0-8]$/.test(id) || db().posts.some(p => p.id === id && !p.hidden);
+}
 
 function publicPost(p) {
   const author = db().users[p.uid];
@@ -383,10 +441,11 @@ function publicPost(p) {
   };
 }
 
-function reactionSummary(viewerId) {
+function reactionSummary(viewerId, visibleIds) {
   const out = {};
   const all = db().reactions;
   Object.keys(all).forEach(function (id) {
+    if (!visibleIds.has(id)) return;
     const r = all[id];
     out[id] = {
       likes: r.likes.length,
@@ -398,10 +457,11 @@ function reactionSummary(viewerId) {
   return out;
 }
 
-function commentsSummary() {
+function commentsSummary(visibleIds) {
   const out = {};
   const all = db().comments;
   Object.keys(all).forEach(function (id) {
+    if (!visibleIds.has(id)) return;
     out[id] = all[id].map(function (c) {
       const author = db().users[c.uid];
       return { id: c.id, name: author ? author.nickname : c.name, text: c.text, at: c.at };
@@ -453,7 +513,7 @@ function cleanProfile(src, user) {
 
 /* ------------------------------------------------------------- 运营后台 */
 
-const DEFAULT_ADMIN = { user: "admin", pass: "ywai2026" };
+const RETIRED_ADMIN_PASSWORD = "ywai2026";
 const DOC_LABELS = { plans: "方案", orders: "订单", merchants: "商家", products: "AI 工具", articles: "资讯" };
 
 function day(ts) {
@@ -465,14 +525,14 @@ function day(ts) {
 function initAdminDoc() {
   const d = db();
   if (!d.admin) {
-    d.admin = adminSeed.migrate(adminSeed.seed());
+    d.admin = adminSeed.seed({ demo: !IS_PRODUCTION });
     d.adminRev = 1;
   }
   const doc = adminSeed.migrate(d.admin);
   doc.settings = doc.settings || {};
   const legacy = doc.settings.admin || {};
   /* 旧版把后台口令明文存在 settings.admin.pass：转成哈希后删除明文 */
-  if (legacy.pass && String(legacy.pass) !== DEFAULT_ADMIN.pass) {
+  if (legacy.pass && String(legacy.pass) !== RETIRED_ADMIN_PASSWORD) {
     if (!d.adminAuth) {
       d.adminAuth = { user: str(legacy.user, 32) || "admin", name: str(legacy.name, 20) || "管理员", pwHash: hashPassword(String(legacy.pass)), ver: 1, updatedAt: Date.now() };
     }
@@ -493,24 +553,30 @@ function adminAccount() {
   const a = db().adminAuth;
   if (ADMIN_USER && ADMIN_PASS) return { user: ADMIN_USER, name: (a && a.name) || "管理员", source: "env", ver: 0 };
   if (a && a.pwHash) return { user: a.user, name: a.name || "管理员", source: "db", ver: a.ver || 1 };
-  return { user: DEFAULT_ADMIN.user, name: (a && a.name) || "管理员", source: "default", ver: 0 };
+  return { user: "", name: "管理员", source: "unset", ver: 0 };
 }
 
 function checkAdminLogin(user, pass) {
   const acc = adminAccount();
-  if (!safeEqual(user, acc.user)) return false;
+  if (acc.source === "unset" || pass === RETIRED_ADMIN_PASSWORD || !safeEqual(user, acc.user)) return false;
   if (acc.source === "env") return safeEqual(pass, ADMIN_PASS);
   if (acc.source === "db") return checkPassword(pass, db().adminAuth.pwHash);
-  return safeEqual(pass, DEFAULT_ADMIN.pass);
+  return false;
 }
 
 /* 后台会话绑定账号与口令版本：改密码后旧会话全部失效。 */
 function adminSession(req) {
   const data = unsign(parseCookies(req)[ADMIN_COOKIE], ADMIN_TTL_SECONDS);
-  if (!data || !data.a) return null;
+  if (!data || !data.a || !data.s || !(adminSessions.get(data.s) > Date.now())) return null;
   const acc = adminAccount();
   if (data.a !== acc.user || Number(data.v || 0) !== acc.ver) return null;
   return acc;
+}
+
+function issueAdminSession(res, acc) {
+  const id = crypto.randomBytes(24).toString("base64url");
+  adminSessions.set(id, Date.now() + ADMIN_TTL_SECONDS * 1000);
+  setCookie(res, ADMIN_COOKIE, sign({ a: acc.user, v: acc.ver, s: id, i: Date.now() }), ADMIN_TTL_SECONDS);
 }
 
 function isAdmin(req) {
@@ -518,7 +584,7 @@ function isAdmin(req) {
 }
 
 function publicAccount(acc) {
-  return { user: acc.user, name: acc.name, source: acc.source, isDefault: acc.source === "default" };
+  return { user: acc.user, name: acc.name, source: acc.source };
 }
 
 function audit(req, action, detail, who) {
@@ -780,10 +846,12 @@ route("GET", "/api/cert/config", function (req, res) {
 route("POST", "/api/auth/send", async function (req, res) {
   const body = await withBody(req, res);
   if (!body) return;
+  if (IS_PRODUCTION && SMS_MODE !== "api") return fail(res, 503, "sms_not_configured", "生产环境未启用真实短信");
   const phone = str(body.phone, 20).replace(/\s|-/g, "");
   if (!isValidPhone(phone)) return fail(res, 400, "invalid_phone", "请输入有效的 11 位手机号");
 
   const rec = otps.get(phone);
+  if (rec && (rec.sending || rec.verifying)) return fail(res, 429, "too_frequent", "验证码请求正在处理");
   if (rec && Date.now() - rec.sentAt < 60e3) {
     return fail(res, 429, "too_frequent", "请求过于频繁，请 " + Math.ceil((60e3 - (Date.now() - rec.sentAt)) / 1000) + " 秒后再试");
   }
@@ -793,15 +861,19 @@ route("POST", "/api/auth/send", async function (req, res) {
 
   if (SMS_MODE === "api") {
     if (!SMS_SEND_URL) return fail(res, 503, "sms_not_configured", "短信通道未配置");
+    const pending = { sending: true, exp: Date.now() + 15e3 };
+    otps.set(phone, pending);
     try {
       const r = await postForm(SMS_SEND_URL, { phone: phone });
-      if (r.status >= 200 && r.status < 300 && (!r.data || r.data.ok !== false)) {
+      if (r.status >= 200 && r.status < 300 && r.data && r.data.ok === true) {
         otps.set(phone, { code: "", exp: Date.now() + 300e3, sentAt: Date.now() });
         return sendJSON(res, 200, { ok: true, expire: 300 });
       }
       return fail(res, 502, "sms_failed", (r.data && r.data.msg) || "验证码发送失败");
     } catch (err) {
       return fail(res, 502, "sms_failed", "验证码发送失败");
+    } finally {
+      if (otps.get(phone) === pending) otps.delete(phone);
     }
   }
 
@@ -814,56 +886,65 @@ route("POST", "/api/auth/send", async function (req, res) {
 route("POST", "/api/auth/session", async function (req, res) {
   const body = await withBody(req, res);
   if (!body) return;
+  if (IS_PRODUCTION && SMS_MODE !== "api") return fail(res, 503, "sms_not_configured", "生产环境未启用真实短信");
   const phone = str(body.phone, 20).replace(/\s|-/g, "");
   const code = str(body.code, 10);
   if (!isValidPhone(phone)) return fail(res, 400, "invalid_phone", "请输入有效的 11 位手机号");
+  if (!/^\d{6}$/.test(code)) return fail(res, 400, "invalid_code", "请输入 6 位数字验证码");
 
   const g = guardOf(phone);
   if (g.lockUntil > Date.now()) {
     return fail(res, 429, "locked", "尝试次数过多，请 " + Math.ceil((g.lockUntil - Date.now()) / 1000) + " 秒后再试");
   }
-
-  if (SMS_MODE === "api") {
-    if (!SMS_VERIFY_URL) return fail(res, 503, "sms_not_configured", "短信通道未配置");
-    try {
-      const r = await postForm(SMS_VERIFY_URL, { phone: phone, code: code });
-      if (r.status < 200 || r.status >= 300 || (r.data && r.data.ok === false)) {
-        return fail(res, 401, "invalid_code", (r.data && r.data.msg) || "验证码不正确");
-      }
-    } catch (err) {
-      return fail(res, 502, "sms_failed", "验证服务暂不可用");
-    }
-  } else {
-    const rec = otps.get(phone);
-    if (!rec) return fail(res, 400, "no_code", "请先获取验证码");
-    if (Date.now() > rec.exp) {
-      otps.delete(phone);
-      return fail(res, 400, "expired", "验证码已过期，请重新获取");
-    }
-    if (!/^\d{6}$/.test(code)) return fail(res, 400, "invalid_code", "请输入 6 位数字验证码");
-    if (code !== rec.code) {
-      const fails = (g.code || 0) + 1;
-      if (fails >= 5) {
-        guards.set(phone, Object.assign({}, g, { code: 0, lockUntil: Date.now() + 60e3 }));
-        return fail(res, 429, "locked", "连续 5 次输入错误，已锁定 60 秒");
-      }
-      guards.set(phone, Object.assign({}, g, { code: fails }));
-      return fail(res, 401, "invalid_code", "验证码不正确，还可尝试 " + (5 - fails) + " 次");
-    }
+  if (rateLimited("code-ip:" + clientIp(req), 30, 600e3)) {
+    return fail(res, 429, "too_frequent", "验证尝试过多，请稍后再试");
   }
 
-  const existing = db().users[userIdFor(phone)];
-  if (!existing && siteToggles().register === false) {
-    return fail(res, 403, "register_closed", "暂停新用户注册，已有账号可正常登录");
-  }
-  if (existing && existing.status === "frozen") {
-    return fail(res, 403, "frozen", "账号已被冻结，如有疑问请联系运营");
-  }
-  otps.delete(phone);
-  guards.set(phone, Object.assign({}, g, { code: 0 }));
-  const r = ensureUser(phone);
-  startSession(res, r.user, body.remember);
-  sendJSON(res, 200, { ok: true, isNew: r.isNew || r.user.onboarded === false, user: publicMe(r.user) });
+  const challenge = otps.get(phone);
+  if (!challenge || challenge.sending || challenge.exp <= Date.now()) return fail(res, 400, "no_code", "请重新获取验证码");
+  if (challenge.verifying) return fail(res, 429, "too_frequent", "验证码正在验证中");
+  challenge.verifying = true;
+  try {
+    if (SMS_MODE === "api") {
+      if (!SMS_VERIFY_URL) return fail(res, 503, "sms_not_configured", "短信通道未配置");
+      try {
+        const r = await postForm(SMS_VERIFY_URL, { phone: phone, code: code });
+        const invalid = (r.data && r.data.ok === false) || r.status === 400 || r.status === 401 || r.status === 403;
+        if (invalid) {
+          return invalidCode(res, phone, (r.data && (r.data.msg || r.data.message)) || "验证码不正确");
+        }
+        if (r.status < 200 || r.status >= 300 || !r.data || r.data.ok !== true) {
+          return fail(res, 502, "sms_failed", "验证服务暂不可用");
+        }
+      } catch (err) {
+        return fail(res, 502, "sms_failed", "验证服务暂不可用");
+      }
+    } else {
+      const rec = otps.get(phone);
+      if (!rec) return fail(res, 400, "no_code", "请先获取验证码");
+      if (Date.now() > rec.exp) {
+        otps.delete(phone);
+        return fail(res, 400, "expired", "验证码已过期，请重新获取");
+      }
+      if (!/^\d{6}$/.test(code)) return fail(res, 400, "invalid_code", "请输入 6 位数字验证码");
+      if (code !== rec.code) {
+        return invalidCode(res, phone);
+      }
+    }
+
+    const existing = db().users[userIdFor(phone)];
+    if (!existing && siteToggles().register === false) {
+      return fail(res, 403, "register_closed", "暂停新用户注册，已有账号可正常登录");
+    }
+    if (existing && existing.status === "frozen") {
+      return fail(res, 403, "frozen", "账号已被冻结，如有疑问请联系运营");
+    }
+    otps.delete(phone);
+    guards.set(phone, Object.assign({}, g, { code: 0 }));
+    const r = ensureUser(phone);
+    startSession(res, r.user, body.remember);
+    sendJSON(res, 200, { ok: true, isNew: r.isNew || r.user.onboarded === false, user: publicMe(r.user) });
+  } finally { challenge.verifying = false; }
 });
 
 /* --- 登录：密码 --- */
@@ -939,11 +1020,12 @@ route("POST", "/api/auth/logout", function (req, res) {
 /* --- 社区：帖子 --- */
 route("GET", "/api/posts", function (req, res) {
   const user = currentUser(req);
+  const visibleIds = publicPostIds();
   sendJSON(res, 200, {
     ok: true,
     posts: db().posts.filter(function (p) { return !p.hidden; }).slice(0, 200).map(publicPost),
-    reactions: reactionSummary(user && user.id),
-    comments: commentsSummary()
+    reactions: reactionSummary(user && user.id, visibleIds),
+    comments: commentsSummary(visibleIds)
   });
 });
 
@@ -992,7 +1074,8 @@ route("POST", /^\/api\/posts\/([A-Za-z0-9_-]{1,40})\/react$/, async function (re
   const body = await withBody(req, res);
   if (!body) return;
   const kind = body.kind === "mark" ? "marks" : body.kind === "like" ? "likes" : null;
-  if (!kind || !POST_ID.test(m[1])) return fail(res, 400, "invalid_request");
+  if (!kind) return fail(res, 400, "invalid_request");
+  if (!canInteractWithPost(m[1])) return fail(res, 404, "not_found", "帖子不存在");
   const all = db().reactions;
   const r = all[m[1]] || (all[m[1]] = { likes: [], marks: [] });
   const idx = r[kind].indexOf(user.id);
@@ -1017,6 +1100,7 @@ route("POST", /^\/api\/posts\/([A-Za-z0-9_-]{1,40})\/comments$/, async function 
   if (!body) return;
   const text = str(body.text, 120);
   if (!text) return fail(res, 400, "empty", "评论不能为空");
+  if (!canInteractWithPost(m[1])) return fail(res, 404, "not_found", "帖子不存在");
   const all = db().comments;
   const list = all[m[1]] || (all[m[1]] = []);
   const c = { id: "c" + Date.now().toString(36) + crypto.randomBytes(2).toString("hex"), uid: user.id, name: user.nickname, text: text, at: Date.now() };
@@ -1039,8 +1123,8 @@ route("GET", "/api/profiles", function (req, res, m, url) {
 
   const isOwner = Boolean(viewer && viewer.id === uid);
   let profile = db().profiles[uid] || null;
-  /* 联系方式只给已登录用户，未登录访客拿到的是空值。 */
-  if (profile && !viewer) profile = Object.assign({}, profile, { phone: "", wechat: "" });
+  /* 个人主页联系方式仅对本人返回。 */
+  if (profile && !isOwner) profile = Object.assign({}, profile, { phone: "", wechat: "" });
   const author = db().users[uid];
   const posts = db().posts.filter(function (p) { return p.uid === uid && !p.hidden; }).slice(0, 50).map(publicPost);
   const reactions = db().reactions;
@@ -1191,17 +1275,20 @@ route("POST", "/api/admin/login", async function (req, res) {
   if (!body) return;
   if (rateLimited("admin:" + clientIp(req), 8, 600e3)) return fail(res, 429, "too_frequent", "尝试次数过多，请 10 分钟后再试");
   const user = str(body.user, 64);
+  if (adminAccount().source === "unset") return fail(res, 503, "admin_not_configured", "后台账号未配置");
   if (!checkAdminLogin(user, String(body.pass || ""))) {
     audit(req, "登录失败", "账号：" + (user || "（空）"), user || "—");
     return fail(res, 401, "bad_credentials", "账号或密码不正确");
   }
   const acc = adminAccount();
-  setCookie(res, ADMIN_COOKIE, sign({ a: acc.user, v: acc.ver, i: Date.now() }), ADMIN_TTL_SECONDS);
-  audit(req, "登录后台", acc.source === "default" ? "使用默认账号" : "", acc.user);
+  issueAdminSession(res, acc);
+  audit(req, "登录后台", "", acc.user);
   sendJSON(res, 200, { ok: true, account: publicAccount(acc) });
 });
 
 route("POST", "/api/admin/logout", function (req, res) {
+  const data = unsign(parseCookies(req)[ADMIN_COOKIE], ADMIN_TTL_SECONDS);
+  if (data && data.s) adminSessions.delete(data.s);
   setCookie(res, ADMIN_COOKIE, "", 0);
   sendJSON(res, 200, { ok: true });
 });
@@ -1212,17 +1299,17 @@ route("POST", "/api/admin/account", async function (req, res) {
   if (acc.source === "env") return fail(res, 409, "managed_by_env", "后台账号由服务器环境变量 ADMIN_USER / ADMIN_PASS 管理，请在服务器上修改");
   const body = await withBody(req, res);
   if (!body) return;
+  if (!isAdmin(req)) return fail(res, 401, "unauthorized", "请先登录后台");
   if (rateLimited("adminpw:" + clientIp(req), 10, 600e3)) return fail(res, 429, "too_frequent", "尝试次数过多，请稍后再试");
   if (!checkAdminLogin(acc.user, String(body.current || ""))) return fail(res, 401, "bad_current", "当前密码不正确");
   const user = str(body.user, 32) || acc.user;
   const name = str(body.name, 20) || acc.name;
   const pass = String(body.pass || "");
   if (!/^[A-Za-z0-9_.-]{3,32}$/.test(user)) return fail(res, 400, "invalid_user", "账号需 3–32 位字母、数字、下划线、点或减号");
-  if (acc.source === "default" && !pass) return fail(res, 400, "need_password", "请设置新密码，默认密码不能继续使用");
   if (pass && (pass.length < 10 || !/[A-Za-z]/.test(pass) || !/\d/.test(pass))) {
     return fail(res, 400, "weak_password", "新密码至少 10 位，且同时包含字母和数字");
   }
-  if (pass && pass === DEFAULT_ADMIN.pass) return fail(res, 400, "weak_password", "不能使用默认密码");
+  if (pass && pass === RETIRED_ADMIN_PASSWORD) return fail(res, 400, "weak_password", "不能使用默认密码");
   const prev = db().adminAuth || {};
   db().adminAuth = {
     user: user,
@@ -1231,10 +1318,14 @@ route("POST", "/api/admin/account", async function (req, res) {
     ver: (prev.ver || 0) + 1,
     updatedAt: Date.now()
   };
-  if (db().admin && db().admin.settings) db().admin.settings.admin = { name: name };
+  if (db().admin && db().admin.settings) {
+    db().admin.settings.admin = { name: name };
+    db().adminRev += 1;
+  }
   store.save();
   const next = adminAccount();
-  setCookie(res, ADMIN_COOKIE, sign({ a: next.user, v: next.ver, i: Date.now() }), ADMIN_TTL_SECONDS);
+  adminSessions.clear();
+  issueAdminSession(res, next);
   audit(req, "修改后台账号", (user !== acc.user ? "账号 " + acc.user + " → " + user + "；" : "") + (pass ? "已更换密码；" : "") + "其他会话已失效", user);
   sendJSON(res, 200, { ok: true, account: publicAccount(next) });
 });
@@ -1243,7 +1334,7 @@ route("POST", "/api/admin/account", async function (req, res) {
 route("GET", "/api/admin/db", function (req, res) {
   const acc = adminSession(req);
   if (!acc) return fail(res, 401, "unauthorized", "请先登录后台");
-  sendJSON(res, 200, { ok: true, doc: db().admin, rev: db().adminRev, live: liveData(), account: publicAccount(acc) });
+  sendJSON(res, 200, { ok: true, doc: db().admin, rev: db().adminRev, live: liveData(), account: publicAccount(acc), demoAllowed: !IS_PRODUCTION });
 });
 
 route("PUT", "/api/admin/db", { limit: 8 * 1024 * 1024 }, async function (req, res) {
@@ -1251,13 +1342,15 @@ route("PUT", "/api/admin/db", { limit: 8 * 1024 * 1024 }, async function (req, r
   const body = await withBody(req, res, 8 * 1024 * 1024);
   if (!body) return;
   const doc = body.doc;
-  if (!doc || typeof doc !== "object" || !doc.settings || !Array.isArray(doc.merchants) || !Array.isArray(doc.products)) {
+  if (!isAdmin(req)) return fail(res, 401, "unauthorized", "请先登录后台");
+  if (!validAdminDoc(doc)) {
     return fail(res, 400, "invalid_doc", "数据结构不正确");
   }
-  if (Number(body.rev) !== db().adminRev) {
+  if (!Number.isSafeInteger(body.rev) || body.rev < 1) return fail(res, 400, "invalid_revision", "必须提供有效的数据版本号");
+  if (body.rev !== db().adminRev) {
     return sendJSON(res, 409, {
-      ok: false, error: "conflict", message: "其他管理员刚刚修改过数据，已为你加载最新版本",
-      doc: db().admin, rev: db().adminRev, live: liveData()
+      ok: false, error: "conflict", message: "后台数据已更新，请刷新后重新应用修改",
+      rev: db().adminRev
     });
   }
   const prev = db().admin;
@@ -1273,8 +1366,9 @@ route("PUT", "/api/admin/db", { limit: 8 * 1024 * 1024 }, async function (req, r
 
 route("POST", "/api/admin/reset", function (req, res) {
   if (!isAdmin(req)) return fail(res, 401, "unauthorized", "请先登录后台");
+  if (IS_PRODUCTION) return fail(res, 403, "demo_disabled", "生产环境不能恢复演示数据");
   const prev = db().admin;
-  db().admin = adminSeed.migrate(adminSeed.seed());
+  db().admin = adminSeed.seed();
   db().admin.settings.admin = { name: (prev && prev.settings && prev.settings.admin && prev.settings.admin.name) || "管理员" };
   db().adminRev += 1;
   store.save();
@@ -1394,13 +1488,16 @@ route("POST", /^\/api\/admin\/applications\/(u_[a-f0-9]{24})$/, async function (
   if (!app) return fail(res, 404, "not_found", "申请不存在");
   const body = await withBody(req, res);
   if (!body) return;
+  if (!isAdmin(req)) return fail(res, 401, "unauthorized", "请先登录后台");
+  if (db().applications[m[1]] !== app || app.status === "approved") return fail(res, 409, "application_changed", "申请已变更，请刷新后重试");
   if (body.action === "approve") {
     const doc = db().admin;
-    const mer = cleanMerchant(Object.assign({ appUid: m[1] }, body.merchant || {}), {
+    const mer = cleanMerchant(Object.assign({}, body.merchant || {}, { appUid: m[1] }), {
       name: app.shopName, stall: app.stallNo, zone: zoneKey(app.zone), zoneName: app.zone, owner: app.contactName,
       phone: (db().users[m[1]] || {}).phone || "", wechat: app.wechat, intro: app.intro
     });
     mer.id = nextMerchantId(doc.merchants);
+    if (!validMerchant(mer)) return fail(res, 400, "invalid_merchant", "商家字段格式不正确");
     doc.merchants.unshift(mer);
     app.status = "approved";
     app.rejectReason = "";
@@ -1443,7 +1540,7 @@ async function handleApi(req, res, pathname, url) {
     if (origin && req.headers.host && origin.replace(/^https?:\/\//, "") !== req.headers.host) {
       return fail(res, 403, "cross_origin", "不允许跨站请求");
     }
-    if (req.headers["content-length"] && Number(req.headers["content-length"]) > 0 && ct.indexOf("application/json") < 0) {
+    if ((Number(req.headers["content-length"]) > 0 || req.headers["transfer-encoding"]) && !/^application\/json(?:\s*;|$)/i.test(ct)) {
       return fail(res, 415, "unsupported_media_type", "请使用 JSON");
     }
   }
@@ -1459,6 +1556,10 @@ async function handleApi(req, res, pathname, url) {
   return fail(res, 404, "not_found");
 }
 
+function requestIsHttps(req) {
+  return Boolean(req.socket.encrypted || (trustedProxy(req) && req.headers["x-forwarded-proto"] === "https"));
+}
+
 const server = http.createServer(function (req, res) {
   let url;
   try {
@@ -1471,6 +1572,8 @@ const server = http.createServer(function (req, res) {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Content-Security-Policy", "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https:; font-src 'self' data: https:");
+  if (IS_PRODUCTION && requestIsHttps(req)) res.setHeader("Strict-Transport-Security", "max-age=31536000");
 
   if (pathname.startsWith("/api/")) {
     Promise.resolve(handleApi(req, res, pathname, url)).catch(function (err) {
@@ -1482,14 +1585,27 @@ const server = http.createServer(function (req, res) {
   serveStatic(req, res, pathname);
 });
 
-initAdminDoc();
-
-server.listen(PORT, HOST, function () {
-  console.log("[yiwu-ai-circle] http://" + HOST + ":" + PORT + "  static=" + STATIC_DIR + "  data=" + store.file);
-  console.log("[yiwu-ai-circle] payment=" + Boolean(WAG_API_KEY && WAG_ENTITLEMENT_ID) + " sms=" + SMS_MODE + " admin=" + adminAccount().source);
-  if (adminAccount().source === "default") {
-    console.warn("[yiwu-ai-circle] ⚠ 运营后台仍在使用默认账号 admin / ywai2026，上线前请设置 ADMIN_USER / ADMIN_PASS");
+const configurationErrors = [];
+if (!["api", "demo"].includes(SMS_MODE)) configurationErrors.push("SMS_MODE");
+if (IS_PRODUCTION) {
+  if (!SESSION_SECRET_CONFIGURED || Buffer.byteLength(SESSION_SECRET) < 32) configurationErrors.push("SESSION_SECRET (32+ random bytes)");
+  if (COOKIE_SECURE !== "1") configurationErrors.push("COOKIE_SECURE=1");
+  if (SMS_MODE !== "api" || !SMS_SEND_URL || !SMS_VERIFY_URL) configurationErrors.push("SMS_MODE=api and SMS provider URLs");
+  if (ADMIN_USER || ADMIN_PASS) {
+    if (!ADMIN_USER || ADMIN_PASS.length < 12 || ADMIN_PASS === RETIRED_ADMIN_PASSWORD) configurationErrors.push("ADMIN_USER / ADMIN_PASS (12+ characters)");
+  } else if (!db().adminAuth || !db().adminAuth.pwHash) {
+    configurationErrors.push("ADMIN_USER / ADMIN_PASS or a migrated hashed admin account");
   }
+}
+if (configurationErrors.length) {
+  console.error("[yiwu-ai-circle] configuration invalid: " + configurationErrors.join(", "));
+  process.exit(1);
+}
+
+initAdminDoc();
+server.listen(PORT, HOST, function () {
+  console.log("[yiwu-ai-circle] http://" + HOST + ":" + server.address().port);
+  console.log("[yiwu-ai-circle] payment=" + Boolean(WAG_API_KEY && WAG_ENTITLEMENT_ID) + " sms=" + SMS_MODE + " admin=" + adminAccount().source);
 });
 
 function shutdown() {

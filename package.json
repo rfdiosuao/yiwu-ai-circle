@@ -5,7 +5,9 @@
   "description": "义乌AI圈：静态站点 + 商家认证支付接口",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "check": "node scripts/check.js",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=20"
