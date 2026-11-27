@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex">
 <title>活动报名 · 义乌AI圈</title>
 <link rel="icon" type="image/png" href="/assets/img/logo-icon.png?v=2">
-<link rel="stylesheet" href="/assets/css/event.css?v=1">
+<link rel="stylesheet" href="/assets/css/event.css?v=2">
 </head>
 <body>
 <main class="ev" data-ev data-state="loading">
@@ -47,6 +47,7 @@
 
           <h1 class="ev__title" id="evTitle" tabindex="-1" data-title>活动报名</h1>
           <ul class="ev__meta" data-meta></ul>
+          <dl class="ev__orgs" data-orgs hidden></dl>
           <p class="ev__intro" data-intro hidden></p>
 
           <form class="ev__form" data-form novalidate>
@@ -87,6 +88,9 @@
             <div class="ev__done-seal" aria-hidden="true">已报名</div>
             <h2 data-done-title>报名成功</h2>
             <p data-done-text>我们已经收到你的报名，活动前会和你联系。</p>
+            <button class="ev__invite-btn" type="button" data-invite-open hidden>
+              <span aria-hidden="true">✦</span> 查看我的专属邀请函
+            </button>
             <div class="ev__done-acts">
               <button class="ev__ghost" type="button" data-share>分享给朋友</button>
               <button class="ev__ghost" type="button" data-edit>修改报名信息</button>
@@ -96,6 +100,9 @@
           <div class="ev__closed" data-closed hidden>
             <h2 data-closed-title>报名已结束</h2>
             <p data-closed-text>感谢关注，下次活动见。</p>
+            <button class="ev__invite-btn" type="button" data-invite-open hidden>
+              <span aria-hidden="true">✦</span> 查看我的专属邀请函
+            </button>
           </div>
         </div>
       </section>
@@ -109,10 +116,32 @@
     <a class="ev__ghost" href="/">去首页</a>
   </div>
 
-  <div class="ev__toast" data-toast role="status" aria-live="polite"></div>
 </main>
 
+<div class="inv" data-invite role="dialog" aria-modal="true" aria-labelledby="invTitle" hidden>
+  <div class="inv__fx" data-invite-fx aria-hidden="true"></div>
+  <div class="inv__panel">
+    <p class="inv__kicker" aria-hidden="true">INVITATION</p>
+    <h2 class="inv__title" id="invTitle" tabindex="-1" data-invite-title>您的专属邀请函</h2>
+    <div class="inv__card" data-invite-card>
+      <div class="inv__loading" data-invite-loading>
+        <span class="inv__spinner" aria-hidden="true"></span>
+        正在为您烫金…
+      </div>
+      <img class="inv__img" data-invite-img alt="" hidden>
+    </div>
+    <p class="inv__hint" data-invite-hint>长按图片保存，发给朋友或朋友圈</p>
+    <div class="inv__acts">
+      <button class="inv__save" type="button" data-invite-save disabled>保存邀请函</button>
+      <button class="inv__close" type="button" data-invite-close>关闭</button>
+    </div>
+  </div>
+</div>
+
+<div class="ev__toast" data-toast role="status" aria-live="polite"></div>
+
 <audio data-audio loop preload="none"></audio>
-<script src="/assets/js/event.js?v=1" defer></script>
+<script src="/assets/js/invite.js?v=3" defer></script>
+<script src="/assets/js/event.js?v=2" defer></script>
 </body>
 </html>
