@@ -15,6 +15,7 @@ const crypto = require("node:crypto");
 const net = require("node:net");
 const { validAdminDoc, validMerchant } = require("./lib/admin-document");
 const installEvents = require("./lib/events");
+const installPartners = require("./lib/partners");
 const { createStore } = require("./lib/store");
 const adminSeed = require("./lib/admin-seed");
 
@@ -1541,6 +1542,7 @@ const eventsModule = installEvents({
   route, db, store, sendJSON, fail, withBody, isAdmin, audit, rateLimited, clientIp, isValidPhone, str,
   dataDir: DATA_DIR, publicBase
 });
+installPartners({ route, db, store, sendJSON, fail, withBody, isAdmin, audit, str, uploadUrl: eventsModule.uploadUrl });
 
 async function handleApi(req, res, pathname, url) {
   if (req.method === "OPTIONS") {

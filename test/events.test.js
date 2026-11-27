@@ -160,3 +160,86 @@ test("leads are admin-only, follow-up is audited and CSV export is Excel-safe", 
   assert.ok(auditLog.includes("导出客资"));
   assert.ok(auditLog.includes("跟进客资"));
 });
+
+test("events carry host, sponsor lists and invitation settings; the public QR points at PUBLIC_URL", async t => {
+  const app = await start(t);
+  const ev = await createEvent(app);
+  assert.equal(ev.host, "义乌AI圈", "new events default to the platform as host");
+  assert.deepEqual(ev.invite, { enabled: true, style: "crimson", message: "" });
+
+  const patch = body => app.request("PATCH", "/api/admin/events/" + ev.id, body, app.admin);
+  assert.equal((await patch({ invite: { style: "gold-leaf" } })).status, 400);
+  assert.equal((await patch({ invite: { message: "长".repeat(151) } })).status, 400);
+  const saved = await patch({
+    host: "义乌AI圈 × 青口直播基地",
+    orgs: { sponsors: "甲物流、乙支付，甲物流", partners: ["青口直播基地", " ", "北下朱选品站"], supporters: "\n" },
+    invite: { style: "ink", message: "诚邀您来现场。" }
+  });
+  assert.equal(saved.status, 200);
+  assert.deepEqual(saved.data.event.orgs, { sponsors: ["甲物流", "乙支付"], partners: ["青口直播基地", "北下朱选品站"], supporters: [] });
+
+  const pub = (await app.request("GET", "/api/events/" + ev.slug)).data.event;
+  assert.equal(pub.host, "义乌AI圈 × 青口直播基地");
+  assert.equal(pub.invite.style, "ink");
+  assert.equal(pub.invite.message, "诚邀您来现场。");
+  const expected = qrcode.encode("https://ywai.example.com/e/" + ev.slug, { ecl: "M" }).modules
+    .map(r => r.map(d => (d ? "1" : "0")).join(""));
+  assert.deepEqual(pub.invite.qr, expected, "invitation QR encodes the public sign-up link");
+
+  assert.equal((await patch({ invite: { enabled: false } })).status, 200);
+  const off = (await app.request("GET", "/api/events/" + ev.slug)).data.event;
+  assert.equal(off.invite, null);
+  assert.equal(off.host, "义乌AI圈 × 青口直播基地", "turning the invitation off keeps other settings");
+});
+
+test("the public event list hides drafts and orders upcoming before past", async t => {
+  const app = await start(t);
+  const soon = await createEvent(app, { title: "下周对接会", startAt: "2099-01-10T14:00" });
+  const later = await createEvent(app, { title: "明年开放日", startAt: "2099-06-01T09:00" });
+  await createEvent(app, { title: "还在筹备", status: "draft" });
+  const done = await createEvent(app, { title: "上次沙龙", startAt: "2020-05-01T14:00" });
+  const closed = await createEvent(app, { title: "提前结束", startAt: "2099-02-01T14:00" });
+  await app.request("PATCH", "/api/admin/events/" + closed.id, { status: "closed" }, app.admin);
+
+  const list = await app.request("GET", "/api/events");
+  assert.equal(list.status, 200);
+  assert.deepEqual(list.data.upcoming.map(e => e.slug), [soon.slug, later.slug]);
+  assert.deepEqual(list.data.past.map(e => e.slug).sort(), [done.slug, closed.slug].sort());
+  const sample = list.data.upcoming[0];
+  assert.equal(sample.id, undefined);
+  assert.equal(sample.leads, undefined, "registration counts stay private");
+  assert.equal(sample.invite, undefined, "the list does not ship QR data");
+});
+
+test("partners: admin-only CRUD, validated links and logos, public list shows only visible entries", async t => {
+  const app = await start(t);
+  const admin = (method, url, body) => app.request(method, url, body, app.admin);
+  assert.equal((await app.request("POST", "/api/admin/partners", { name: "未登录", kind: "sponsor" })).status, 401);
+  assert.equal((await app.request("GET", "/api/admin/partners")).status, 401);
+
+  assert.equal((await admin("POST", "/api/admin/partners", { name: "缺类型" })).status, 400);
+  assert.equal((await admin("POST", "/api/admin/partners", { name: "坏链接", kind: "partner", url: "javascript:alert(1)" })).status, 400);
+  const audio = await admin("POST", "/api/admin/uploads", { name: "bg.mp3", kind: "audio", data: MP3.toString("base64") });
+  assert.equal((await admin("POST", "/api/admin/partners", { name: "音频当 Logo", kind: "partner", logo: audio.data.upload.id })).status, 400);
+
+  const logo = await admin("POST", "/api/admin/uploads", { name: "logo.png", kind: "image", data: PNG.toString("base64") });
+  const sponsor = await admin("POST", "/api/admin/partners", { name: "甲物流", kind: "sponsor", url: "example.com/about", logo: logo.data.upload.id, weight: 5 });
+  assert.equal(sponsor.status, 200);
+  assert.equal(sponsor.data.partner.url, "https://example.com/about");
+  const hidden = await admin("POST", "/api/admin/partners", { name: "暂不公开", kind: "supporter", show: false });
+  const top = await admin("POST", "/api/admin/partners", { name: "青口直播基地", kind: "partner", weight: 9 });
+  assert.equal(top.status, 200);
+
+  const pub = await app.request("GET", "/api/partners");
+  assert.deepEqual(pub.data.partners.map(p => p.name), ["青口直播基地", "甲物流"], "sorted by weight, hidden ones left out");
+  assert.deepEqual(Object.keys(pub.data.partners[1]).sort(), ["intro", "kind", "logoUrl", "name", "url"]);
+  assert.match(pub.data.partners[1].logoUrl, /^\/uploads\/[a-f0-9]{24}\.png$/);
+
+  assert.equal((await admin("PATCH", "/api/admin/partners/" + hidden.data.partner.id, { show: true })).status, 200);
+  assert.equal((await app.request("GET", "/api/partners")).data.partners.length, 3);
+  assert.equal((await admin("DELETE", "/api/admin/partners/" + sponsor.data.partner.id)).status, 200);
+  assert.equal((await admin("DELETE", "/api/admin/partners/" + sponsor.data.partner.id)).status, 404);
+
+  const auditLog = (await admin("GET", "/api/admin/audit")).data.items.map(i => i.action);
+  for (const action of ["新增合作伙伴", "修改合作伙伴", "删除合作伙伴"]) assert.ok(auditLog.includes(action), action);
+});

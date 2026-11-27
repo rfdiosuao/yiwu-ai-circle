@@ -272,7 +272,8 @@
     {
       group: "活动运营", items: [
         { id: "events", label: "活动报名", i: "10" },
-        { id: "leads", label: "客资", i: "11", badge: "leads" }
+        { id: "leads", label: "客资", i: "11", badge: "leads" },
+        { id: "partners", label: "合作伙伴", i: "12" }
       ]
     },
     { group: "系统", items: [{ id: "settings", label: "站点设置", i: "08" }, { id: "audit", label: "操作日志", i: "09" }] }
@@ -289,7 +290,8 @@
     settings: "站点设置",
     audit: "操作日志",
     events: "活动报名",
-    leads: "客资"
+    leads: "客资",
+    partners: "合作伙伴"
   };
 
   function renderNav() {

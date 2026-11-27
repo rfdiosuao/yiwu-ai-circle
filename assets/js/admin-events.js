@@ -28,6 +28,11 @@
     { v: "lost", t: "无意向" }
   ];
   var FIELD_MODES = [{ v: "optional", t: "选填" }, { v: "required", t: "必填" }, { v: "off", t: "不收集" }];
+  var INVITE_STYLES = [
+    { v: "crimson", t: "鸿运朱金（红底鎏金，喜庆隆重）" },
+    { v: "ink", t: "墨金典藏（黑底鎏金，沉稳高级）" },
+    { v: "poster", t: "海报定制（用活动海报做背景）" }
+  ];
 
   var ev = { events: [], leads: [], filter: { event: "", status: "", q: "" } };
 
@@ -96,6 +101,7 @@
           '<button class="row-btn" type="button" data-act="ev:qr" data-id="' + e.id + '">二维码</button>' +
           '<button class="row-btn" type="button" data-act="ev:leads" data-id="' + e.id + '">客资</button>' +
           '<a class="row-btn" href="/e/' + esc(e.slug) + '" target="_blank" rel="noopener">' + (e.status === "draft" ? "预览" : "打开") + "</a>" +
+          (e.invite && e.invite.enabled !== false ? '<a class="row-btn" href="/e/' + esc(e.slug) + '?invite=preview" target="_blank" rel="noopener">邀请函</a>' : "") +
           '<button class="row-btn" type="button" data-act="ev:edit" data-id="' + e.id + '">编辑</button>' +
           "</div></td></tr>";
       }).join("");
@@ -103,7 +109,10 @@
   };
 
   /* ---------------- 新建 / 编辑 ---------------- */
-  function fileField(label, kind, current, hint) {
+  function fileField(label, kind, current, hint, name) {
+    var input = name || (kind === "image" ? "poster" : "music");
+    var remove = name ? "remove_" + name : (kind === "image" ? "removePoster" : "removeMusic");
+    var what = name ? "图片" : (kind === "image" ? "海报" : "音乐");
     var preview = kind === "image"
       ? (current ? '<img src="' + esc(current) + '" alt="当前海报" style="max-width:120px;max-height:160px;border-radius:8px;outline:1px solid rgba(0,0,0,.1);outline-offset:-1px">' : "")
       : (current ? '<audio controls preload="none" src="' + esc(current) + '" style="width:100%"></audio>' : "");
@@ -111,16 +120,25 @@
       '<div class="ev-upload" data-upload="' + kind + '">' +
       '<div data-upload-preview>' + preview + "</div>" +
       '<input class="input" type="file" accept="' + (kind === "image" ? "image/jpeg,image/png,image/webp" : "audio/mpeg,audio/mp4,audio/ogg,.mp3,.m4a,.ogg") + '" data-upload-input>' +
-      '<input type="hidden" name="' + (kind === "image" ? "poster" : "music") + '" data-upload-id>' +
+      '<input type="hidden" name="' + input + '" data-upload-id>' +
       '<span class="dhint" data-upload-status>' + esc(hint) + "</span>" +
-      (current ? '<label class="dhint" style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="' + (kind === "image" ? "removePoster" : "removeMusic") + '" value="1"> 移除当前' + (kind === "image" ? "海报" : "音乐") + "</label>" : "") +
+      (current ? '<label class="dhint" style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="' + remove + '" value="1"> 移除当前' + what + "</label>" : "") +
       "</div>", "full");
   }
 
   function openEvent(id) {
     var e = id ? eventOf(id) : null;
     var isNew = !e;
-    if (!e) e = { title: "", subtitle: "", startAt: "", place: "", intro: "", deadline: "", capacity: 0, status: "draft", slug: "", fields: { name: "optional", company: "optional", project: "optional" } };
+    if (!e) {
+      e = {
+        title: "", subtitle: "", startAt: "", place: "", intro: "", deadline: "", capacity: 0, status: "draft", slug: "",
+        host: "义乌AI圈", orgs: { sponsors: [], partners: [], supporters: [] }, invite: { enabled: true, style: "crimson", message: "" },
+        fields: { name: "required", company: "optional", project: "optional" }
+      };
+    }
+    var orgs = e.orgs || {};
+    var inv = e.invite || { enabled: true, style: "crimson", message: "" };
+    var orgText = function (k) { return esc((orgs[k] || []).join("、")); };
     UI.openDrawer({
       kicker: isNew ? "新建活动" : "活动 /e/" + e.slug,
       title: isNew ? "新建活动" : e.title,
@@ -138,10 +156,22 @@
         field("手机号", '<select disabled><option>必填</option></select>', "", "手机号是客资的唯一标识，固定必填") +
         field("公司 / 档口", '<select name="f_company">' + opts(FIELD_MODES, e.fields.company) + "</select>") +
         field("项目 / 需求", '<select name="f_project">' + opts(FIELD_MODES, e.fields.project) + "</select>") +
+        '<div class="dsection full">主办与合作</div>' +
+        field("主办方", '<input class="input" name="host" value="' + esc(e.host == null ? "义乌AI圈" : e.host) + '" maxlength="30" placeholder="义乌AI圈">', "full", "显示在报名页，并作为邀请函的落款（××× 敬邀）") +
+        field("赞助方", '<textarea name="sponsors" maxlength="400" style="min-height:64px" placeholder="多个用顿号、逗号或换行隔开">' + orgText("sponsors") + "</textarea>") +
+        field("合作方", '<textarea name="partners" maxlength="400" style="min-height:64px" placeholder="多个用顿号、逗号或换行隔开">' + orgText("partners") + "</textarea>") +
+        field("支持方", '<textarea name="supporters" maxlength="400" style="min-height:64px" placeholder="如：义乌市电子商务协会">' + orgText("supporters") + "</textarea>", "", "每类最多 12 个；会显示在报名页和邀请函的「联合呈现」里") +
+        '<div class="dsection full">专属邀请函</div>' +
+        field("报名后弹出邀请函", '<select name="inv_enabled">' + opts([{ v: "1", t: "开启" }, { v: "0", t: "关闭" }], inv.enabled === false ? "0" : "1") + "</select>", "", "访客提交后自动生成，可长按保存、发朋友圈") +
+        field("邀请函样式", '<select name="inv_style">' + opts(INVITE_STYLES, inv.style || "crimson") + "</select>", "", "选「海报定制」但没上传海报时，自动用墨金典藏") +
+        field("邀请语", '<textarea name="inv_message" maxlength="150" placeholder="留空自动生成：诚挚邀请您莅临「活动标题」……敬请拨冗光临。">' + esc(inv.message || "") + "</textarea>", "full",
+          "抬头自动写「尊敬的 + 访客称呼」，所以建议把「称呼」设为必填。" +
+          (isNew ? "保存后可以预览。" : ' <a href="/e/' + esc(e.slug) + '?invite=preview" target="_blank" rel="noopener">用示例称呼预览邀请函 →</a>')) +
+        '<div class="dsection full">名额与发布</div>' +
         field("报名截止", '<input class="input" type="datetime-local" name="deadline" value="' + esc(e.deadline) + '">', "", "留空表示不限") +
         field("名额", '<input class="input" type="number" name="capacity" min="0" step="1" value="' + (e.capacity || 0) + '">', "", "0 表示不限；已报名的人满额后仍可修改资料") +
         field("状态", '<select name="status">' + opts([{ v: "draft", t: "草稿（只有后台能预览）" }, { v: "open", t: "报名中" }, { v: "closed", t: "已结束" }], e.status) + "</select>") +
-        field("链接后缀", '<input class="input" name="slug" value="' + esc(e.slug) + '" maxlength="40" pattern="[a-z0-9-]{2,40}" placeholder="自动生成">', "", "报名链接为 /e/后缀，只能用小写字母、数字和减号") +
+        field("链接后缀", '<input class="input" name="slug" value="' + esc(e.slug) + '" maxlength="40" pattern="[a-z0-9\\-]{2,40}" placeholder="自动生成">', "", "报名链接为 /e/后缀，只能用小写字母、数字和减号") +
         "</form>",
       foot: (isNew ? "" : '<button class="row-btn row-btn--red" type="button" data-act="ev:delete" data-id="' + e.id + '">删除</button>') +
         '<span class="spacer"></span>' +
@@ -151,7 +181,10 @@
         var body = {
           title: d.title, subtitle: d.subtitle, startAt: d.startAt, place: d.place, intro: d.intro,
           deadline: d.deadline, capacity: Number(d.capacity) || 0, status: d.status,
-          fields: { name: d.f_name, company: d.f_company, project: d.f_project }
+          fields: { name: d.f_name, company: d.f_company, project: d.f_project },
+          host: d.host,
+          orgs: { sponsors: d.sponsors, partners: d.partners, supporters: d.supporters },
+          invite: { enabled: d.inv_enabled !== "0", style: d.inv_style, message: d.inv_message }
         };
         if (d.slug && d.slug !== e.slug) body.slug = d.slug.trim().toLowerCase();
         if (d.poster) body.poster = d.poster;
@@ -424,6 +457,109 @@
       paintLeads();
     }, 250);
   });
+
+  /* ======================================================================
+     合作伙伴：赞助方 / 合作方 / 支持方，首页底部滚动展示
+     ====================================================================== */
+  var KINDS = [{ v: "sponsor", t: "赞助方" }, { v: "partner", t: "合作方" }, { v: "supporter", t: "支持方" }];
+  var KIND_PILL = { sponsor: "pill--red", partner: "pill--ink", supporter: "pill--mute" };
+  var partners = [];
+
+  function partnerOf(id) { return partners.filter(function (p) { return p.id === id; })[0] || null; }
+
+  UI.VIEWS.partners = {
+    html: function () {
+      return '<div class="ahead">' +
+        '<div><div class="ahead__kicker"><b>12</b><span>活动运营</span></div>' +
+        '<h1>合作伙伴</h1><p class="ahead__sub">赞助方、合作方、支持方。设为「首页展示」的会出现在首页底部两排滚动条里：赞助方一排，合作方和支持方一排。</p></div>' +
+        '<div class="ahead__actions"><a class="btn btn--sm btn--ghost" href="/#partners" target="_blank" rel="noopener">看首页效果</a>' +
+        '<button class="btn btn--sm btn--red" type="button" data-act="pt:new">新增合作伙伴</button></div></div>' +
+        '<div class="panel"><div class="tbl-wrap"><table class="tbl"><thead><tr>' +
+        '<th>Logo</th><th>名称</th><th>类型</th><th>链接</th><th>首页</th><th>排序</th><th style="text-align:right">操作</th>' +
+        '</tr></thead><tbody id="ptBody"><tr class="is-static"><td colspan="7"><div class="aempty">加载中…</div></td></tr></tbody></table></div></div>';
+    }
+  };
+
+  UI.PAINT.partners = function () {
+    req("GET", "/api/admin/partners").then(function (r) {
+      var body = document.getElementById("ptBody");
+      if (!body) return;
+      if (!r.ok) {
+        body.innerHTML = '<tr class="is-static"><td colspan="7"><div class="aempty"><strong>加载失败</strong>' + esc(r.message || "请刷新重试") + "</div></td></tr>";
+        return;
+      }
+      partners = r.partners;
+      if (!partners.length) {
+        body.innerHTML = '<tr class="is-static"><td colspan="7"><div class="aempty"><strong>还没有合作伙伴</strong>点右上角「新增合作伙伴」。没有 Logo 也可以，首页会用名称做成字标。</div></td></tr>';
+        return;
+      }
+      body.innerHTML = partners.map(function (p) {
+        return '<tr class="is-static">' +
+          "<td>" + (p.logoUrl ? '<img src="' + esc(p.logoUrl) + '" alt="" style="height:32px;max-width:96px;object-fit:contain;display:block">' : '<span class="muted">—</span>') + "</td>" +
+          '<td class="strong">' + esc(p.name) + (p.intro ? '<div class="muted" style="font-weight:400;font-size:12px">' + esc(p.intro) + "</div>" : "") + "</td>" +
+          '<td><span class="pill ' + (KIND_PILL[p.kind] || "") + '">' + esc(p.kindLabel || p.kind) + "</span></td>" +
+          '<td class="muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis">' + (p.url ? '<a href="' + esc(p.url) + '" target="_blank" rel="noopener nofollow">' + esc(p.url.replace(/^https?:\/\//, "").replace(/\/$/, "")) + "</a>" : "—") + "</td>" +
+          "<td>" + (p.show !== false ? '<span class="pill pill--ok">展示</span>' : '<span class="pill pill--mute">隐藏</span>') + "</td>" +
+          '<td class="num">' + (p.weight || 0) + "</td>" +
+          '<td><div class="tbl__acts">' +
+          '<button class="row-btn" type="button" data-act="pt:edit" data-id="' + p.id + '">编辑</button>' +
+          '<button class="row-btn row-btn--red" type="button" data-act="pt:delete" data-id="' + p.id + '">删除</button>' +
+          "</div></td></tr>";
+      }).join("");
+    });
+  };
+
+  function openPartner(id) {
+    var p = id ? partnerOf(id) : null;
+    var isNew = !p;
+    if (!p) p = { name: "", kind: "sponsor", logoUrl: "", url: "", intro: "", weight: 0, show: true };
+    UI.openDrawer({
+      kicker: isNew ? "新增合作伙伴" : p.kindLabel,
+      title: isNew ? "新增合作伙伴" : p.name,
+      sub: "名称和类型必填；Logo 建议透明底横版 PNG，没有也可以。",
+      body: '<form id="drawerForm" class="dgrid">' +
+        field("名称", '<input class="input" name="name" value="' + esc(p.name) + '" maxlength="30" required placeholder="如：义乌市电子商务协会">', "full") +
+        field("类型", '<select name="kind">' + opts(KINDS, p.kind) + "</select>") +
+        field("首页展示", '<select name="show">' + opts([{ v: "1", t: "展示" }, { v: "0", t: "隐藏" }], p.show === false ? "0" : "1") + "</select>") +
+        fileField("Logo", "image", p.logoUrl, "透明底横版效果最好，JPG / PNG / WebP，5MB 以内", "logo") +
+        field("官网链接", '<input class="input" name="url" value="' + esc(p.url) + '" maxlength="200" placeholder="https://（可留空）">', "full") +
+        field("一句话介绍", '<input class="input" name="intro" value="' + esc(p.intro) + '" maxlength="60" placeholder="可留空，鼠标停在 Logo 上时显示">', "full") +
+        field("排序", '<input class="input" type="number" name="weight" min="0" max="999" step="1" value="' + (p.weight || 0) + '">', "", "越大越靠前") +
+        "</form>",
+      foot: (isNew ? "" : '<button class="row-btn row-btn--red" type="button" data-act="pt:delete" data-id="' + p.id + '">删除</button>') +
+        '<span class="spacer"></span>' +
+        '<button class="btn btn--sm btn--ghost" type="button" data-close-drawer>取消</button>' +
+        '<button class="btn btn--sm btn--red" type="submit" form="drawerForm" data-ev-save>保存</button>',
+      save: function (d) {
+        var body = { name: d.name, kind: d.kind, show: d.show !== "0", url: d.url, intro: d.intro, weight: Number(d.weight) || 0 };
+        if (d.logo) body.logo = d.logo;
+        else if (d.remove_logo) body.logo = "";
+        var btn = document.querySelector("[data-ev-save]");
+        if (btn) btn.disabled = true;
+        req(isNew ? "POST" : "PATCH", isNew ? "/api/admin/partners" : "/api/admin/partners/" + p.id, body).then(function (r) {
+          if (btn) btn.disabled = false;
+          if (!r.ok) { toast(r.message || "保存失败"); return; }
+          UI.closeDrawer();
+          toast(isNew ? "已添加，首页刷新即可看到" : "已保存");
+          UI.render();
+        });
+      }
+    });
+    bindUploads();
+  }
+
+  UI.ACTIONS["pt:new"] = function () { openPartner(null); };
+  UI.ACTIONS["pt:edit"] = function (id) { openPartner(id); };
+  UI.ACTIONS["pt:delete"] = function (id) {
+    var p = partnerOf(id);
+    if (!p || !window.confirm("删除合作伙伴「" + p.name + "」？首页会立即不再展示。")) return;
+    req("DELETE", "/api/admin/partners/" + id).then(function (r) {
+      if (!r.ok) { toast(r.message || "删除失败"); return; }
+      UI.closeDrawer();
+      toast("已删除");
+      UI.render();
+    });
+  };
 
   /* 登录后台后先取一次活动列表，侧栏「客资」角标显示待联系人数 */
   DB.onSync(function (st) {

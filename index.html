@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="assets/css/pages.css?v=10">
 <link rel="stylesheet" href="assets/css/auth.css?v=10">
 <link rel="stylesheet" href="assets/css/refresh.css?v=10">
+<link rel="stylesheet" href="assets/css/showcase.css?v=1">
 <link rel="stylesheet" href="assets/css/mobile.css?v=10">
 </head>
 <body data-page="home" class="has-tabbar">
@@ -43,6 +44,7 @@
       <a href="posts.html" data-nav="posts"><i>02</i>社区</a>
       <a href="products.html" data-nav="products"><i>03</i>AI 工具</a>
       <a href="merchants.html" data-nav="merchants"><i>04</i>商家</a>
+      <a href="events.html" data-nav="events"><i>05</i>活动</a>
     </nav>
     <div class="head-actions">
       <a class="btn btn--sm btn--ink" href="login.html" data-auth-entry>登录 / 入场</a>
@@ -427,6 +429,47 @@
     </div>
   </section>
 
+  <!-- ============ EVENTS ============ -->
+  <section class="sec" id="events" data-home-events hidden>
+    <div class="wrap">
+      <div class="sec-head" data-reveal>
+        <div>
+          <div class="sec-head__idx mono"><b>06</b><span>近期活动</span></div>
+          <h2 class="sec-title">线下见一面，生意才落地</h2>
+          <p class="sec-sub">选品对接会、AI 实操课、直播基地开放日。扫码就能报名，报完还有一张专属邀请函。</p>
+        </div>
+        <a class="sec-foot-note" href="events.html">全部活动 →</a>
+      </div>
+      <div class="evgrid" data-home-events-list></div>
+    </div>
+  </section>
+
+  <!-- ============ PARTNERS ============ -->
+  <section class="sec partners" id="partners" data-partners aria-labelledby="partnersTitle">
+    <div class="wrap">
+      <div class="sec-head" data-reveal>
+        <div>
+          <div class="sec-head__idx mono"><b data-sec-idx>07</b><span>合作伙伴</span></div>
+          <h2 class="sec-title" id="partnersTitle">一起把义乌生意做大的伙伴</h2>
+          <p class="sec-sub">赞助方、合作方、支持方。每一场活动、每一个工具，背后都有他们一起搭台。</p>
+        </div>
+        <button class="marquee-toggle" type="button" data-marquee-toggle aria-pressed="false" hidden>暂停滚动</button>
+      </div>
+      <div class="partners__empty" data-partners-empty hidden>
+        <strong>赞助、合作、支持席位开放中</strong>
+        <p>欢迎品牌方、服务商、协会和我们一起办活动、做内容，上榜后会展示在这里。</p>
+      </div>
+    </div>
+    <div class="prow prow--sponsor" data-prow="sponsor" hidden>
+      <div class="wrap"><div class="prow__label">赞助方 <span class="mono">SPONSORS</span></div></div>
+      <div class="marquee__viewport"><div class="marquee__track"></div></div>
+    </div>
+    <div class="prow prow--other" data-prow="other" hidden>
+      <div class="wrap"><div class="prow__label">合作方 · 支持方 <span class="mono">PARTNERS</span></div></div>
+      <div class="marquee__viewport"><div class="marquee__track"></div></div>
+    </div>
+  </section>
+
 </main>
 
 <footer class="site-foot">
@@ -446,6 +489,7 @@
           <li><a href="posts.html">社区 · 发帖</a></li>
           <li><a href="products.html">AI 工具 · 订阅</a></li>
           <li><a href="merchants.html">商家 · 名录</a></li>
+          <li><a href="events.html">活动 · 报名</a></li>
         </ul>
       </div>
       <div class="foot__col">
@@ -491,5 +535,6 @@
 <script src="assets/js/config.js?v=10" defer></script>
 <script src="assets/js/auth.js?v=10" defer></script>
 <script src="assets/js/site.js?v=10" defer></script>
+<script src="assets/js/showcase.js?v=1" defer></script>
 </body>
 </html>
