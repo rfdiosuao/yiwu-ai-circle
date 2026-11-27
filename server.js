@@ -14,6 +14,7 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const net = require("node:net");
 const { validAdminDoc, validMerchant } = require("./lib/admin-document");
+const installEvents = require("./lib/events");
 const { createStore } = require("./lib/store");
 const adminSeed = require("./lib/admin-seed");
 
@@ -90,6 +91,9 @@ const SMS_MODE = (conf("SMS_MODE") || (IS_PRODUCTION ? "api" : "demo")).toLowerC
 const DEMO_CODE = conf("DEMO_CODE");
 const SMS_SEND_URL = conf("SMS_SEND_URL").trim();
 const SMS_VERIFY_URL = conf("SMS_VERIFY_URL").trim();
+
+/* 对外访问地址（二维码里的链接用它）；不填则按请求的 Host 推断 */
+const PUBLIC_URL = conf("PUBLIC_URL").trim().replace(/\/+$/, "");
 
 const ADMIN_USER = conf("ADMIN_USER");
 const ADMIN_PASS = conf("ADMIN_PASS");
@@ -1528,6 +1532,16 @@ route("DELETE", /^\/api\/admin\/applications\/(u_[a-f0-9]{24})$/, function (req,
   sendJSON(res, 200, { ok: true });
 });
 
+/* --- 活动报名与客资 --- */
+function publicBase(req) {
+  if (PUBLIC_URL) return PUBLIC_URL;
+  return (requestIsHttps(req) ? "https" : "http") + "://" + String(req.headers.host || "localhost");
+}
+const eventsModule = installEvents({
+  route, db, store, sendJSON, fail, withBody, isAdmin, audit, rateLimited, clientIp, isValidPhone, str,
+  dataDir: DATA_DIR, publicBase
+});
+
 async function handleApi(req, res, pathname, url) {
   if (req.method === "OPTIONS") {
     res.writeHead(204, { "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS", "Access-Control-Allow-Headers": "Content-Type" });
@@ -1582,6 +1596,12 @@ const server = http.createServer(function (req, res) {
     });
     return;
   }
+  if (pathname.startsWith("/uploads/")) {
+    if (eventsModule.serveUpload(req, res, pathname)) return;
+    return serveStatic(req, res, "/__missing__");
+  }
+  /* 活动短链 /e/<slug> 统一由 event.html 渲染 */
+  if (/^\/e\/[a-z0-9-]{1,40}\/?$/.test(pathname)) return serveStatic(req, res, "/event.html");
   serveStatic(req, res, pathname);
 });
 

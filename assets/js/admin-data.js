@@ -358,6 +358,7 @@
     userOf: userOf,
     money: money,
     daysLeft: daysLeft,
-    addDays: addDays
+    addDays: addDays,
+    request: req
   };
 })();
