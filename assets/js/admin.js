@@ -234,13 +234,18 @@
   drawerVeil.addEventListener("click", closeDrawer);
 
   /* ---------------- nav ---------------- */
+  /* 扩展模块（如活动报名 admin-events.js）登记的角标、动作 */
+  var EXTRA_BADGES = {};
+  var ACTIONS = {};
+
   function counts() {
     return {
       users: db.users.length,
       orders: db.orders.filter(function (o) { return o.status === "pending"; }).length,
       merchants: db.merchants.filter(function (m) { return m.status === "pending"; }).length,
       articles: db.articles.filter(function (a) { return a.status === "draft"; }).length,
-      posts: db.posts.filter(function (p) { return p.status === "reported"; }).length
+      posts: db.posts.filter(function (p) { return p.status === "reported"; }).length,
+      leads: EXTRA_BADGES.leads || 0
     };
   }
 
@@ -264,6 +269,12 @@
         { id: "posts", label: "社区帖子", i: "07", badge: "posts" }
       ]
     },
+    {
+      group: "活动运营", items: [
+        { id: "events", label: "活动报名", i: "10" },
+        { id: "leads", label: "客资", i: "11", badge: "leads" }
+      ]
+    },
     { group: "系统", items: [{ id: "settings", label: "站点设置", i: "08" }, { id: "audit", label: "操作日志", i: "09" }] }
   ];
 
@@ -276,7 +287,9 @@
     articles: "资讯与政策",
     posts: "社区帖子",
     settings: "站点设置",
-    audit: "操作日志"
+    audit: "操作日志",
+    events: "活动报名",
+    leads: "客资"
   };
 
   function renderNav() {
@@ -1834,6 +1847,8 @@
       case "data:reset-confirm": DB.reset().then(function (r) {
         if (r.ok) { closeModal(); render(); toast("已恢复初始内容"); }
       }); break;
+      default:
+        if (ACTIONS[act]) ACTIONS[act](id, btn, e);
     }
   });
 
@@ -1989,6 +2004,25 @@
   });
 
 
+
+  /* ---------------- 扩展接口：其他后台模块在这里注册页面和动作 ---------------- */
+  window.AdminUI = {
+    VIEWS: VIEWS,
+    PAINT: PAINT,
+    ACTIONS: ACTIONS,
+    BADGES: EXTRA_BADGES,
+    state: state,
+    esc: esc,
+    opts: opts,
+    field: field,
+    toast: toast,
+    render: render,
+    renderNav: renderNav,
+    openDrawer: openDrawer,
+    closeDrawer: closeDrawer,
+    openModal: openModal,
+    closeModal: closeModal
+  };
 
   /* ---------------- boot ---------------- */
   dateEl.textContent = (function () {

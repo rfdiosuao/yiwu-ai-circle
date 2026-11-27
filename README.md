@@ -25,7 +25,9 @@ npm start
 | 商家认证 | 认证申请资料 |
 | 运营后台 | 商家、AI 工具、资讯、方案、订单、站点设置。新生产实例从空商家、工具、资讯、订单和统计起步 |
 | 后台账号 | 账号与 scrypt 哈希后的密码（不再明文保存，也不会下发到浏览器） |
-| 操作日志 | 后台登录、改账号、保存数据、处理用户/帖子/认证的记录，保留最近 500 条 |
+| 操作日志 | 后台登录、改账号、保存数据、处理用户/帖子/认证/客资的记录，保留最近 500 条 |
+| 活动与客资 | 活动报名页配置、扫码报名提交的称呼 / 手机 / 公司 / 需求及跟进状态 |
+| 上传文件 | 活动海报和背景音乐，存放在 `data/uploads/`，经 `/uploads/…` 访问 |
 
 写盘采用「临时文件 + rename」，进程退出前会强制落盘。**备份只需复制 `data/` 目录。**
 单实例部署足够；后续访问量上来可把 `lib/store.js` 换成 SQLite / Postgres，接口不用改。
@@ -37,6 +39,7 @@ npm start
 | 变量 | 说明 |
 | --- | --- |
 | `PORT` | 端口，默认 8000 |
+| `PUBLIC_URL` | 对外访问地址，如 `https://www.example.com`。活动二维码里的链接用它，上线务必填写 |
 | `HOST` | 监听地址，默认 `127.0.0.1` |
 | `NODE_ENV` | 线上设为 `production`，启用生产配置校验并关闭演示恢复 |
 | `SESSION_SECRET` | 生产必填，使用至少 32 字节随机密钥。开发可自动生成并保存到 `data/.session-secret` |
@@ -67,6 +70,8 @@ npm start
 - **站点设置**：开放注册、允许评论、前台展示价格、接受入驻申请、维护模式都会真实生效（服务端校验）。
 - **多人编辑**：整库提交要求当前版本号。冲突时当前页面保留编辑结果并停止继续提交，刷新后可按最新版重新应用修改。真实用户、帖子和认证操作在整库请求成功后逐条提交。
 - **操作日志**：左侧「操作日志」可查看谁在什么时候改了什么。
+- **活动报名**：新建活动时上传海报和背景音乐，选择收集哪些项（称呼 / 公司 / 需求，手机号固定必填），设置截止时间和名额。保存后生成 `/e/<后缀>` 报名链接和二维码（SVG / PNG 下载）。草稿状态只有后台能预览。
+- **客资**：扫码报名的人无需登录，同一活动同一手机号只保留一条。可按活动、跟进状态筛选，写备注，导出 CSV（Excel 直接打开，导出会记录在操作日志里）。
 
 升级前备份 `data/`。启动时旧后台明文密码转为哈希，并移除旧的演示用户和帖子集合。已有商家、工具、订单和设置会保留。版本号由服务端管理，保存时对记录及设置执行字段校验。浏览器导出会移除结构化的账号口令、联系方式和收款字段，完整备份请使用服务端数据目录。
 
@@ -89,6 +94,10 @@ npm start
 | GET / PUT | `/api/admin/db` | 拉取 / 保存后台数据（带版本号，冲突返回 409） |
 | POST / PATCH / DELETE | `/api/admin/members`、`/api/admin/posts/:id`、`/api/admin/applications/:uid` | 管理真实用户、帖子、认证申请 |
 | GET / POST | `/api/admin/audit`、`/api/admin/reset` | 操作日志 / 恢复初始内容 |
+| GET / POST | `/api/events/:slug`、`/api/events/:slug/register` | 活动报名页读取活动 / 提交报名（无需登录，按 IP 和手机号限频） |
+| GET / POST / PATCH / DELETE | `/api/admin/events`、`/api/admin/events/:id`、`/api/admin/events/:id/qr.svg` | 管理活动、下载报名二维码 |
+| POST | `/api/admin/uploads` | 上传海报（JPG / PNG / WebP ≤ 5MB）和音乐（MP3 / M4A / OGG ≤ 10MB），按文件头校验类型 |
+| GET / PATCH / DELETE | `/api/admin/leads`、`/api/admin/leads/:id`、`/api/admin/leads.csv` | 客资列表、跟进状态与备注、导出 |
 | GET | `/api/stats`、`/api/health` | 首页实时统计 / 健康检查 |
 
 ## 目录
@@ -97,6 +106,9 @@ npm start
 server.js          服务入口与全部接口
 lib/store.js       JSON 文件存储
 lib/admin-seed.js  后台初始内容（商家、AI 工具、资讯、方案）
+lib/events.js      活动报名、客资、上传文件
+lib/qrcode.js      二维码生成（无第三方依赖）
+event.html         活动报名页（/e/<后缀>），脚本与样式为 assets/js/event.js、assets/css/event.css
 *.html             页面
 assets/css/        样式；refresh.css 为新版 UI 层（卡片、圆角、导航、按钮）
 assets/js/         前端脚本；auth.js 负责登录态，site.js 负责社区等交互
