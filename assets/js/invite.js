@@ -4,8 +4,11 @@
    可以长按保存、发给朋友或朋友圈。底部二维码指向报名页，扫码的人也能报名。
 
    window.YWInvite.render(data) → Promise<HTMLCanvasElement>
-   data: { style, name, company, title, subtitle, timeText, place, host,
-           orgs: { sponsors, partners, supporters }, message, qr: ["0101…"], posterUrl, logoUrl }
+   window.YWInvite.fromEvent(活动, "letter" | "poster") → data（报名页和后台共用）
+   data: { style, name, company, greeting, title, subtitle, timeText, place, host,
+           orgs: [{ label, names }], message, signature, signDate, qr: ["0101…"], posterUrl, logoUrl }
+   没有访客称呼时（通用邀请函）抬头写 greeting。
+   其他样式（如科技蓝长图 invite-tech.js）注册到 YWInvite.styles[样式名]，共用这里的工具函数。
    ========================================================================== */
 (function () {
   "use strict";
@@ -533,7 +536,7 @@
     spaced(ctx, "尊敬的", CX, y, 12, "center");
     y += 116;
 
-    var who = d.name || d.company || "嘉宾";
+    var who = d.name || d.company || d.greeting || "嘉宾";
     var fit = fitLine(ctx, who, CW - 120, 96, 54, 700, KAI);
     ctx.save();
     ctx.font = font(700, fit.size, KAI);
@@ -567,7 +570,7 @@
     ctx.fillStyle = t.text;
     var msg = String(d.message || defaultMessage(d)).split("\n").map(function (p) { return p.trim(); })
       .filter(Boolean).map(function (p) { return "　　" + p; }).join("\n");
-    wrap(ctx, msg, CW, 9).forEach(function (line) {
+    wrap(ctx, msg, CW, 18).forEach(function (line) {
       ctx.fillText(line, L, y);
       y += 72;
     });
@@ -603,10 +606,10 @@
       y += boxH + 64;
     }
 
-    /* 赞助 / 合作 / 支持 */
-    var orgs = d.orgs || {};
-    var orgRows = [["赞助", orgs.sponsors], ["合作", orgs.partners], ["支持", orgs.supporters]]
-      .filter(function (r) { return r[1] && r[1].length; });
+    /* 组织单位：指导单位 / 赞助方 / 合作方…… */
+    var orgRows = (Array.isArray(d.orgs) ? d.orgs : [])
+      .filter(function (g) { return g.names && g.names.length; })
+      .map(function (g) { return [g.label, g.names]; });
     if (orgRows.length) {
       ctx.textAlign = "center";
       ctx.font = font(600, 26, SANS);
@@ -619,14 +622,19 @@
       ctx.beginPath(); ctx.moveTo(CX + 96, y - 9); ctx.lineTo(R - 40, y - 9); ctx.stroke();
       y += 66;
       ctx.textAlign = "left";
+      /* 身份名称是后台自己填的，按最长的一个留出标签列（最多约 7 个字） */
+      ctx.font = font(600, 28, SANS);
+      var labW = Math.min(200, Math.max.apply(null, orgRows.map(function (r) { return ctx.measureText(r[0]).width; })));
+      var nameX = L + 22 + Math.max(128, labW + 22);
       orgRows.forEach(function (r) {
-        ctx.font = font(600, 28, SANS);
+        var lab = fitLine(ctx, r[0], labW, 28, 20, 600, SANS);
+        ctx.font = font(600, lab.size, SANS);
         ctx.fillStyle = t.gold;
-        ctx.fillText(r[0] + "方", L + 22, y);
+        ctx.fillText(lab.text, L + 22, y);
         ctx.font = font(500, 32, SANS);
         ctx.fillStyle = t.text;
-        var lines = wrapItems(ctx, r[1], "  ·  ", CW - 170, 3);
-        lines.forEach(function (line, j) { ctx.fillText(line, L + 150, y + j * 50); });
+        var lines = wrapItems(ctx, r[1], "  ·  ", R - 20 - nameX, 3);
+        lines.forEach(function (line, j) { ctx.fillText(line, nameX, y + j * 50); });
         y += lines.length * 50 + 18;
       });
       y += 40;
@@ -637,13 +645,13 @@
     var host = String(d.host || "义乌AI圈");
     ctx.textAlign = "right";
     var sigR = R - 138;
-    var sig = fitLine(ctx, host + "  敬邀", sigR - L - 40, 44, 30, 700, SERIF);
+    var sig = fitLine(ctx, d.signature || host + "  敬邀", sigR - L - 40, 44, 26, 700, SERIF);
     ctx.font = font(700, sig.size, SERIF);
     ctx.fillStyle = goldFill(ctx, y - sig.size, y + 8);
     ctx.fillText(sig.text, sigR, y);
     ctx.font = font(400, 30, SERIF);
     ctx.fillStyle = t.sub;
-    ctx.fillText(cnDate(new Date()), sigR, y + 58);
+    ctx.fillText(d.signDate || cnDate(new Date()), sigR, y + 58);
     seal(ctx, t, R - 44, y + 8, 116);
     y += 150;
 
@@ -667,7 +675,77 @@
     return y;
   }
 
+  var STYLES = {};
+
+  /* ---------------- 从活动数据（/api/events/:slug）拼出画图要的数据 ---------------- */
+  function pad2(n) { return String(n).padStart(2, "0"); }
+
+  /* 2026-12-09T14:00 → 2026年12月9日（周三）14:00 */
+  function fmtLong(v) {
+    if (!v) return "";
+    var d = new Date(v);
+    if (isNaN(d.getTime())) return "";
+    return d.getFullYear() + "年" + (d.getMonth() + 1) + "月" + d.getDate() + "日（周" + "日一二三四五六".charAt(d.getDay()) + "）" +
+      pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+  }
+
+  /* 有结束时间：同一天写成 14:00-17:00，跨天写成「至 12月21日（周一）17:00」 */
+  function withEnd(text, start, end) {
+    if (!text || !end) return text;
+    var a = new Date(start);
+    var b = new Date(end);
+    if (isNaN(b.getTime()) || b <= a) return text;
+    var hm = pad2(b.getHours()) + ":" + pad2(b.getMinutes());
+    return text + (a.toDateString() === b.toDateString() ? "-" + hm : " 至 " + fmtLong(end).replace(/^\d+年/, ""));
+  }
+
+  /* 落款日期：2026-11-27 → 2026年11月27日 */
+  function fmtDate(v) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || "");
+    return m ? Number(m[1]) + "年" + Number(m[2]) + "月" + Number(m[3]) + "日" : "";
+  }
+
+  /*
+   * mode：letter 邀请函（报名页上的在线版，也是发到邮箱的那张图）；poster 用来转发的长图海报。
+   * 邀请函抬头写后台填的「抬头」（如「各位行业家人们」），不写具体某个人。
+   */
+  function fromEvent(ev, mode) {
+    var poster = mode === "poster";
+    var inv = ev.invite || { style: "tech", message: "" };
+    return {
+      style: poster ? "tech" : (inv.style || "tech"),
+      poster: poster,
+      greeting: poster ? "" : (inv.greeting || "各位嘉宾"),
+      signature: inv.signature || "",
+      signDate: fmtDate(inv.date),
+      message: poster ? "" : (inv.message || ""),
+      qr: ev.qr,
+      name: "",
+      company: "",
+      title: ev.title,
+      subtitle: ev.subtitle,
+      intro: ev.intro,
+      timeText: withEnd(fmtLong(ev.startAt), ev.startAt, ev.endAt),
+      deadlineText: fmtLong(ev.deadline),
+      place: ev.place,
+      host: ev.host,
+      orgs: ev.orgs,
+      agenda: ev.agenda,
+      talks: ev.talks,
+      notice: ev.notice,
+      posterUrl: ev.posterUrl,
+      visualUrl: ev.visualUrl,
+      visualAt: ev.visualAt,
+      logoUrls: ev.logoUrls || [],
+      contact: ev.contact,
+      slogan: ev.slogan,
+      capacity: ev.capacity,
+      logoUrl: "/assets/img/logo-light.png?v=2"
+    };
+  }
+
   function render(d) {
+    if (STYLES[d.style]) return STYLES[d.style](d);
     var t = THEMES[d.style] || THEMES.crimson;
     return Promise.all([
       d.style === "poster" ? null : loadImage(d.logoUrl),
@@ -694,5 +772,17 @@
     });
   }
 
-  window.YWInvite = { render: render, defaultMessage: defaultMessage };
+  window.YWInvite = {
+    render: render,
+    fromEvent: fromEvent,
+    fmtLong: fmtLong,
+    withEnd: withEnd,
+    defaultMessage: defaultMessage,
+    styles: STYLES,
+    util: {
+      SANS: SANS, SERIF: SERIF, KAI: KAI,
+      rng: rng, hash: hash, loadImage: loadImage, font: font, roundRect: roundRect, diamond: diamond,
+      spaced: spaced, wrap: wrap, wrapItems: wrapItems, fitLine: fitLine, cnDate: cnDate
+    }
+  };
 })();

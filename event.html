@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex">
 <title>活动报名 · 义乌AI圈</title>
 <link rel="icon" type="image/png" href="/assets/img/logo-icon.png?v=2">
-<link rel="stylesheet" href="/assets/css/event.css?v=2">
+<link rel="stylesheet" href="/assets/css/event.css?v=5">
 </head>
 <body>
 <main class="ev" data-ev data-state="loading">
@@ -49,17 +49,46 @@
           <ul class="ev__meta" data-meta></ul>
           <dl class="ev__orgs" data-orgs hidden></dl>
           <p class="ev__intro" data-intro hidden></p>
+          <details class="ev__more" data-more hidden>
+            <summary data-more-label>查看流程与议题</summary>
+            <div class="ev__more-body">
+              <section data-agenda-wrap hidden>
+                <h3>流程安排</h3>
+                <ol class="ev__agenda" data-agenda></ol>
+              </section>
+              <section data-talks-wrap hidden>
+                <h3>活动议题</h3>
+                <ol class="ev__talks" data-talks></ol>
+              </section>
+            </div>
+          </details>
 
           <form class="ev__form" data-form novalidate>
+            <div class="ev__member" data-member hidden>
+              <p class="ev__member-kicker">已登录，报名资料已帮你填好</p>
+              <dl class="ev__member-info" data-member-info></dl>
+              <p class="ev__form-error" data-quick-error role="alert"></p>
+              <button class="ev__submit" type="button" data-quick>一键报名</button>
+              <p class="ev__member-note">点「一键报名」即表示同意义乌AI圈收集以上信息，仅用于本次活动报名、发送邀请函和后续联系。详见<a href="/legal.html#privacy" target="_blank" rel="noopener">《隐私政策》</a></p>
+              <button class="ev__textbtn" type="button" data-member-edit>修改报名信息</button>
+            </div>
+            <div class="ev__fields" data-fields>
             <div class="ev__field" data-field="name">
               <label for="f-name">称呼 <span class="ev__tag" data-mark>选填</span></label>
               <input id="f-name" name="name" type="text" autocomplete="name" maxlength="40" aria-describedby="f-name-err">
               <p class="ev__err" id="f-name-err"></p>
             </div>
             <div class="ev__field" data-field="phone">
-              <label for="f-phone">手机号 <span class="ev__tag ev__tag--req">必填</span></label>
-              <input id="f-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="13" required aria-describedby="f-phone-err">
+              <label for="f-phone">手机号 <span class="ev__tag ev__tag--req" data-phone-tag>必填</span></label>
+              <input id="f-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="13" required aria-describedby="f-phone-hint f-phone-err">
+              <p class="ev__hint" id="f-phone-hint" data-phone-hint hidden>用登录账号的手机号报名。要替别人报名，请先退出登录</p>
               <p class="ev__err" id="f-phone-err"></p>
+            </div>
+            <div class="ev__field" data-field="email">
+              <label for="f-email">邮箱 <span class="ev__tag" data-mark>选填</span></label>
+              <input id="f-email" name="email" type="email" inputmode="email" autocomplete="email" maxlength="80" aria-describedby="f-email-hint f-email-err" placeholder="name@example.com">
+              <p class="ev__hint" id="f-email-hint" data-email-hint hidden>报名成功后，活动邀请函会发到这个邮箱</p>
+              <p class="ev__err" id="f-email-err"></p>
             </div>
             <div class="ev__field" data-field="company">
               <label for="f-company">公司 / 档口 <span class="ev__tag" data-mark>选填</span></label>
@@ -75,22 +104,21 @@
             <div class="ev__consent">
               <label class="ev__check">
                 <input type="checkbox" name="consent" aria-describedby="f-consent-err">
-                <span>我同意义乌AI圈收集以上信息，仅用于本次活动报名和后续联系。详见<a href="/legal.html#privacy" target="_blank" rel="noopener">《隐私政策》</a></span>
+                <span>我同意义乌AI圈收集以上信息，仅用于本次活动报名、发送邀请函和后续联系。详见<a href="/legal.html#privacy" target="_blank" rel="noopener">《隐私政策》</a></span>
               </label>
               <p class="ev__err" id="f-consent-err"></p>
             </div>
 
             <p class="ev__form-error" data-form-error role="alert"></p>
             <button class="ev__submit" type="submit" data-submit>提交报名</button>
+            </div>
           </form>
 
           <div class="ev__done" data-done tabindex="-1" hidden>
             <div class="ev__done-seal" aria-hidden="true">已报名</div>
             <h2 data-done-title>报名成功</h2>
             <p data-done-text>我们已经收到你的报名，活动前会和你联系。</p>
-            <button class="ev__invite-btn" type="button" data-invite-open hidden>
-              <span aria-hidden="true">✦</span> 查看我的专属邀请函
-            </button>
+            <p class="ev__mailed" data-done-mail hidden></p>
             <div class="ev__done-acts">
               <button class="ev__ghost" type="button" data-share>分享给朋友</button>
               <button class="ev__ghost" type="button" data-edit>修改报名信息</button>
@@ -100,10 +128,12 @@
           <div class="ev__closed" data-closed hidden>
             <h2 data-closed-title>报名已结束</h2>
             <p data-closed-text>感谢关注，下次活动见。</p>
-            <button class="ev__invite-btn" type="button" data-invite-open hidden>
-              <span aria-hidden="true">✦</span> 查看我的专属邀请函
-            </button>
           </div>
+
+          <aside class="ev__notice" data-notice hidden>
+            <b>温馨提示</b>
+            <p data-notice-text></p>
+          </aside>
         </div>
       </section>
     </div>
@@ -122,7 +152,7 @@
   <div class="inv__fx" data-invite-fx aria-hidden="true"></div>
   <div class="inv__panel">
     <p class="inv__kicker" aria-hidden="true">INVITATION</p>
-    <h2 class="inv__title" id="invTitle" tabindex="-1" data-invite-title>您的专属邀请函</h2>
+    <h2 class="inv__title" id="invTitle" tabindex="-1" data-invite-title>邀请函</h2>
     <div class="inv__card" data-invite-card>
       <div class="inv__loading" data-invite-loading>
         <span class="inv__spinner" aria-hidden="true"></span>
@@ -132,7 +162,7 @@
     </div>
     <p class="inv__hint" data-invite-hint>长按图片保存，发给朋友或朋友圈</p>
     <div class="inv__acts">
-      <button class="inv__save" type="button" data-invite-save disabled>保存邀请函</button>
+      <button class="inv__save" type="button" data-invite-save disabled><span data-invite-save-label>保存邀请函</span></button>
       <button class="inv__close" type="button" data-invite-close>关闭</button>
     </div>
   </div>
@@ -141,7 +171,8 @@
 <div class="ev__toast" data-toast role="status" aria-live="polite"></div>
 
 <audio data-audio loop preload="none"></audio>
-<script src="/assets/js/invite.js?v=3" defer></script>
-<script src="/assets/js/event.js?v=2" defer></script>
+<script src="/assets/js/invite.js?v=6" defer></script>
+<script src="/assets/js/invite-tech.js?v=3" defer></script>
+<script src="/assets/js/event.js?v=6" defer></script>
 </body>
 </html>

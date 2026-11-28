@@ -1,0 +1,35 @@
+# 义乌AI圈 · systemd 服务
+# 安装：cp deploy/yiwu-ai-circle.service /etc/systemd/system/ && systemctl daemon-reload && systemctl enable --now yiwu-ai-circle
+# 代码在 /opt/yiwu-ai-circle，数据在 /var/lib/yiwu-ai-circle，配置（含密钥）在 /etc/yiwu-ai-circle/env
+[Unit]
+Description=yiwu-ai-circle (义乌AI圈)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=yiwu
+Group=yiwu
+WorkingDirectory=/opt/yiwu-ai-circle
+EnvironmentFile=/etc/yiwu-ai-circle/env
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=3
+TimeoutStopSec=10
+
+# 只能写数据目录，其余只读
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/yiwu-ai-circle
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

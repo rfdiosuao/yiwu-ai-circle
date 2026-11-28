@@ -32,10 +32,12 @@
 
   /* ---------------- 活动卡片 ---------------- */
   function evCard(e, past) {
-    var orgs = e.orgs || {};
+    /* 卡片上只放主办方和第一类组织单位（通常是赞助方），完整名单在报名页 */
+    var groups = Array.isArray(e.orgs) ? e.orgs : [];
     var org = [];
     if (e.host) org.push("<b>主办</b>" + esc(e.host));
-    if (orgs.sponsors && orgs.sponsors.length) org.push("<b>赞助</b>" + esc(orgs.sponsors.slice(0, 3).join("、")) + (orgs.sponsors.length > 3 ? " 等" : ""));
+    var first = groups.filter(function (g) { return !/主办/.test(g.label); })[0];
+    if (first) org.push("<b>" + esc(first.label.replace(/(单位|方)$/, "") || first.label) + "</b>" + esc(first.names.slice(0, 3).join("、")) + (first.names.length > 3 ? " 等" : ""));
     var state = past ? "closed" : e.state;
     return '<a class="evcard' + (past ? " evcard--past" : "") + '" href="/e/' + encodeURIComponent(e.slug) + '">' +
       '<div class="evcard__media">' +

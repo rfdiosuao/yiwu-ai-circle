@@ -16,6 +16,7 @@ const net = require("node:net");
 const { validAdminDoc, validMerchant } = require("./lib/admin-document");
 const installEvents = require("./lib/events");
 const installPartners = require("./lib/partners");
+const { createMailer } = require("./lib/mailer");
 const { createStore } = require("./lib/store");
 const adminSeed = require("./lib/admin-seed");
 
@@ -88,6 +89,7 @@ const adminSessions = new Map();
 /* COOKIE_SECURE：1 强制 Secure，0 关闭，留空则按请求是否 HTTPS 自动判断。 */
 const COOKIE_SECURE = conf("COOKIE_SECURE") || (IS_PRODUCTION ? "1" : "");
 
+/* api：真实短信；demo：本地演示（验证码显示在页面上，生产环境禁止）；off：暂不开放会员登录（还没开通短信时上线用） */
 const SMS_MODE = (conf("SMS_MODE") || (IS_PRODUCTION ? "api" : "demo")).toLowerCase();
 const DEMO_CODE = conf("DEMO_CODE");
 const SMS_SEND_URL = conf("SMS_SEND_URL").trim();
@@ -95,6 +97,12 @@ const SMS_VERIFY_URL = conf("SMS_VERIFY_URL").trim();
 
 /* 对外访问地址（二维码里的链接用它）；不填则按请求的 Host 推断 */
 const PUBLIC_URL = conf("PUBLIC_URL").trim().replace(/\/+$/, "");
+
+/* 发邮件（报名后把邀请函发到报名人邮箱）；不配 SMTP_HOST 就不发 */
+const mailer = createMailer({
+  host: conf("SMTP_HOST"), port: conf("SMTP_PORT"), secure: conf("SMTP_SECURE"),
+  user: conf("SMTP_USER"), pass: conf("SMTP_PASS"), from: conf("SMTP_FROM")
+});
 
 const ADMIN_USER = conf("ADMIN_USER");
 const ADMIN_PASS = conf("ADMIN_PASS");
@@ -847,10 +855,13 @@ route("GET", "/api/cert/config", function (req, res) {
   });
 });
 
+const LOGIN_CLOSED_MESSAGE = "会员登录暂未开放。活动报名不需要登录，扫码就能报名";
+
 /* --- 登录：发送验证码 --- */
 route("POST", "/api/auth/send", async function (req, res) {
   const body = await withBody(req, res);
   if (!body) return;
+  if (SMS_MODE === "off") return fail(res, 503, "login_closed", LOGIN_CLOSED_MESSAGE);
   if (IS_PRODUCTION && SMS_MODE !== "api") return fail(res, 503, "sms_not_configured", "生产环境未启用真实短信");
   const phone = str(body.phone, 20).replace(/\s|-/g, "");
   if (!isValidPhone(phone)) return fail(res, 400, "invalid_phone", "请输入有效的 11 位手机号");
@@ -891,6 +902,7 @@ route("POST", "/api/auth/send", async function (req, res) {
 route("POST", "/api/auth/session", async function (req, res) {
   const body = await withBody(req, res);
   if (!body) return;
+  if (SMS_MODE === "off") return fail(res, 503, "login_closed", LOGIN_CLOSED_MESSAGE);
   if (IS_PRODUCTION && SMS_MODE !== "api") return fail(res, 503, "sms_not_configured", "生产环境未启用真实短信");
   const phone = str(body.phone, 20).replace(/\s|-/g, "");
   const code = str(body.code, 10);
@@ -956,6 +968,7 @@ route("POST", "/api/auth/session", async function (req, res) {
 route("POST", "/api/auth/password", async function (req, res) {
   const body = await withBody(req, res);
   if (!body) return;
+  if (SMS_MODE === "off") return fail(res, 503, "login_closed", LOGIN_CLOSED_MESSAGE);
   const phone = str(body.phone, 20).replace(/\s|-/g, "");
   const pw = String(body.password || "");
   if (!isValidPhone(phone)) return fail(res, 400, "invalid_phone", "请输入有效的 11 位手机号");
@@ -1239,7 +1252,9 @@ route("GET", "/api/site", function (req, res) {
       siteName: s.siteName || "义乌AI圈",
       tagline: s.tagline || "",
       ticker: Array.isArray(s.ticker) ? s.ticker : [],
-      toggles: { register: t.register !== false, comment: t.comment !== false, showPrice: t.showPrice !== false, merchantApply: t.merchantApply !== false }
+      toggles: { register: t.register !== false, comment: t.comment !== false, showPrice: t.showPrice !== false, merchantApply: t.merchantApply !== false },
+      /* 短信没开通时（SMS_MODE=off）登录页显示「暂未开放」 */
+      login: SMS_MODE !== "off"
     },
     dicts: doc.dicts || { zones: [], cats: [] },
     merchants: (doc.merchants || []).filter(function (m) { return m && m.status === "approved"; })
@@ -1540,7 +1555,7 @@ function publicBase(req) {
 }
 const eventsModule = installEvents({
   route, db, store, sendJSON, fail, withBody, isAdmin, audit, rateLimited, clientIp, isValidPhone, str,
-  dataDir: DATA_DIR, publicBase
+  dataDir: DATA_DIR, publicBase, mailer, currentUser
 });
 installPartners({ route, db, store, sendJSON, fail, withBody, isAdmin, audit, str, uploadUrl: eventsModule.uploadUrl });
 
@@ -1608,11 +1623,13 @@ const server = http.createServer(function (req, res) {
 });
 
 const configurationErrors = [];
-if (!["api", "demo"].includes(SMS_MODE)) configurationErrors.push("SMS_MODE");
+if (!["api", "demo", "off"].includes(SMS_MODE)) configurationErrors.push("SMS_MODE (api / demo / off)");
+configurationErrors.push(...mailer.problems(IS_PRODUCTION));
 if (IS_PRODUCTION) {
   if (!SESSION_SECRET_CONFIGURED || Buffer.byteLength(SESSION_SECRET) < 32) configurationErrors.push("SESSION_SECRET (32+ random bytes)");
   if (COOKIE_SECURE !== "1") configurationErrors.push("COOKIE_SECURE=1");
-  if (SMS_MODE !== "api" || !SMS_SEND_URL || !SMS_VERIFY_URL) configurationErrors.push("SMS_MODE=api and SMS provider URLs");
+  if (SMS_MODE === "demo") configurationErrors.push("SMS_MODE=api (with SMS provider URLs) or SMS_MODE=off");
+  else if (SMS_MODE === "api" && (!SMS_SEND_URL || !SMS_VERIFY_URL)) configurationErrors.push("SMS_SEND_URL / SMS_VERIFY_URL");
   if (ADMIN_USER || ADMIN_PASS) {
     if (!ADMIN_USER || ADMIN_PASS.length < 12 || ADMIN_PASS === RETIRED_ADMIN_PASSWORD) configurationErrors.push("ADMIN_USER / ADMIN_PASS (12+ characters)");
   } else if (!db().adminAuth || !db().adminAuth.pwHash) {
@@ -1627,7 +1644,7 @@ if (configurationErrors.length) {
 initAdminDoc();
 server.listen(PORT, HOST, function () {
   console.log("[yiwu-ai-circle] http://" + HOST + ":" + server.address().port);
-  console.log("[yiwu-ai-circle] payment=" + Boolean(WAG_API_KEY && WAG_ENTITLEMENT_ID) + " sms=" + SMS_MODE + " admin=" + adminAccount().source);
+  console.log("[yiwu-ai-circle] payment=" + Boolean(WAG_API_KEY && WAG_ENTITLEMENT_ID) + " sms=" + SMS_MODE + " mail=" + mailer.configured + " admin=" + adminAccount().source);
 });
 
 function shutdown() {
