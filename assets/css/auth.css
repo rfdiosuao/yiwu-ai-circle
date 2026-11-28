@@ -706,3 +706,19 @@
   .code-row { flex-wrap: nowrap; }
   .auth__tabs .auth__tab { margin-right: 20px; }
 }
+
+/* 会员登录暂未开放（服务端 SMS_MODE=off） */
+.auth-closed {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  margin-top: 6px;
+  padding: 18px 18px 20px;
+  border: 1px dashed var(--ink-20);
+  background: var(--paper);
+}
+.auth-closed[hidden] { display: none; }
+.auth-closed .mono { color: var(--red); font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.14em; }
+.auth-closed h3 { font-size: 20px; letter-spacing: -0.02em; }
+.auth-closed p { font-size: 13px; line-height: 1.7; color: var(--ink-55); margin-bottom: 6px; }
+.auth-step[hidden], .auth__tabs[hidden], .auth-legal[hidden], .auth__desc[hidden] { display: none !important; }

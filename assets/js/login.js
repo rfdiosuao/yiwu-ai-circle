@@ -21,6 +21,16 @@
     Array.prototype.forEach.call(document.querySelectorAll(".demo-hint"), function (el) { el.remove(); });
   }
 
+  /* 还没开通短信（服务端 SMS_MODE=off）：收起登录表单，告诉访客活动报名不用登录 */
+  fetch("/api/site", { credentials: "same-origin" }).then(function (r) { return r.json(); }).then(function (d) {
+    if (!d || !d.settings || d.settings.login !== false) return;
+    var closed = sheet.querySelector("[data-login-closed]");
+    if (!closed) return;
+    closed.hidden = false;
+    if (tabs) tabs.hidden = true;
+    Array.prototype.forEach.call(sheet.querySelectorAll(".auth-step, .auth-div, .socials, .demo-hint, .auth-legal, .auth__desc"), function (el) { el.hidden = true; });
+  }).catch(function () {});
+
   var pending = null;
 
   var params = new URLSearchParams(window.location.search);

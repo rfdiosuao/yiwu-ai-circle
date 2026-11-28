@@ -49,7 +49,7 @@ npm start
 | `NODE_ENV` | 线上设为 `production`，启用生产配置校验并关闭演示恢复 |
 | `SESSION_SECRET` | 生产必填，使用至少 32 字节随机密钥。开发可自动生成并保存到 `data/.session-secret` |
 | `ADMIN_USER` / `ADMIN_PASS` | 后台账号。设置后以此为准，忽略后台「设置」页里的账号 |
-| `SMS_MODE` | `demo`（演示）或 `api`（真实短信） |
+| `SMS_MODE` | `api`（真实短信）、`demo`（演示，验证码显示在页面上，生产环境禁止）或 `off`（暂不开放会员登录：登录页显示「暂未开放」，活动报名照常，适合短信还没开通时先上线） |
 | `SMS_SEND_URL` / `SMS_VERIFY_URL` | 短信上游接口接收表单 POST `phone`、`code`。成功返回 HTTP 2xx 和 JSON `{ "ok": true }`，验证码错误返回 `{ "ok": false }` 或 HTTP 400 / 401 / 403 |
 | `WAG_API_KEY` / `WAG_ENTITLEMENT_ID` | 爱猹收支付，商家认证付费用 |
 | `CERT_PRICE` | 认证价格，默认 99 |
@@ -62,7 +62,19 @@ npm start
 1. 设置 `NODE_ENV=production`、随机 `SESSION_SECRET`，以及 `ADMIN_USER` 和至少 12 位的 `ADMIN_PASS`。已有独立哈希账号可以继续使用。仅有旧版明文账号的部署，首次升级时先配置环境变量账号。
 2. 前面挂 Nginx / Caddy 做 HTTPS，限制后端端口只能由反代访问。配置可信反代地址，并由反代覆盖 `X-Forwarded-Proto`、正确设置 `X-Forwarded-For`。
 3. 用 systemd / pm2 守护进程，`data/` 放在持久化磁盘上并定期备份。
-4. 接真实短信：服务端设 `SMS_MODE=api` 与两个接口地址，同时把 `assets/js/config.js` 里的 `sms.mode` 改为 `"api"`（隐藏页面上的演示提示）。
+4. 接真实短信：服务端设 `SMS_MODE=api` 与两个接口地址，同时把 `assets/js/config.js` 里的 `sms.mode` 改为 `"api"`（隐藏页面上的演示提示）。短信还没开通时设 `SMS_MODE=off` 先上线。
+
+### 部署到一台 Linux 服务器（systemd + Caddy）
+
+`deploy/` 里是现成的配置：`yiwu-ai-circle.service`（systemd）、`Caddyfile`（自动 HTTPS）、`env.example`（生产配置模板）。
+
+1. 域名 A 记录指向服务器 IP；服务器在中国大陆的，域名要先备案。防火墙 / 安全组只对外开放 22、80、443。
+2. 安装 Node.js 20 以上和 Caddy。项目没有第三方依赖，不用 `npm install`。
+3. 建运行用户和目录：`useradd --system --home /var/lib/yiwu-ai-circle yiwu`，代码放 `/opt/yiwu-ai-circle`，数据目录 `/var/lib/yiwu-ai-circle` 归 `yiwu` 所有。
+4. `cp deploy/env.example /etc/yiwu-ai-circle/env`，填 `SESSION_SECRET`、`ADMIN_USER`、`ADMIN_PASS`（和发信邮箱），`chmod 600`。
+5. 安装并启动服务：`cp deploy/yiwu-ai-circle.service /etc/systemd/system/`，`systemctl daemon-reload && systemctl enable --now yiwu-ai-circle`，用 `journalctl -u yiwu-ai-circle` 看日志。
+6. `cp deploy/Caddyfile /etc/caddy/Caddyfile && systemctl reload caddy`，Caddy 会自动申请证书。
+7. 定期备份 `/var/lib/yiwu-ai-circle`（含 `uploads/`）。更新代码：在 `/opt/yiwu-ai-circle` 拉取新版本后 `systemctl restart yiwu-ai-circle`。
 
 ## 运营后台
 
@@ -128,6 +140,7 @@ lib/admin-seed.js  后台初始内容（商家、AI 工具、资讯、方案）
 lib/events.js      活动报名、客资、上传文件、前台活动列表
 lib/partners.js    合作伙伴（赞助方 / 合作方 / 支持方）
 lib/mailer.js      发邮件（最小 SMTP 客户端，支持 SSL / STARTTLS、内嵌图片）
+deploy/            生产部署：systemd 服务、Caddy 反代（自动 HTTPS）、环境变量模板
 lib/qrcode.js      二维码生成（无第三方依赖）
 event.html         活动报名页（/e/<后缀>），脚本与样式为 assets/js/event.js、assets/css/event.css；邀请函绘制在 assets/js/invite.js，科技蓝长图在 assets/js/invite-tech.js
 events.html        前台活动板块；首页「近期活动」「合作伙伴」与它共用 assets/js/showcase.js、assets/css/showcase.css

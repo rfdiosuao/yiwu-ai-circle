@@ -1,0 +1,12 @@
+# 义乌AI圈 · Caddy 反向代理（自动申请和续期 HTTPS 证书）
+# 安装：cp deploy/Caddyfile /etc/caddy/Caddyfile && systemctl reload caddy
+# 需要：域名已解析到这台服务器，80 和 443 端口对外开放
+yiwuai.homes {
+	encode zstd gzip
+	# Caddy 会用真实客户端地址覆盖 X-Forwarded-For，并设置 X-Forwarded-Proto
+	reverse_proxy 127.0.0.1:8000
+}
+
+www.yiwuai.homes {
+	redir https://yiwuai.homes{uri} permanent
+}

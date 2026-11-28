@@ -535,3 +535,18 @@ test("logged-in members sign up with their verified phone and their details carr
   await app.request("POST", "/api/events/" + second.slug + "/register", { phone: "13900009999", name: "同事小王", consent: true }, cookie);
   assert.equal((await app.request("GET", "/api/events/" + second.slug + "/me", undefined, cookie)).data.member.name, "陈总");
 });
+
+test("production can launch with member login off (SMS_MODE=off) while event sign-up keeps working", async t => {
+  const app = await start(t, { NODE_ENV: "production", SMS_MODE: "off", COOKIE_SECURE: "1" });
+  const send = await app.request("POST", "/api/auth/send", { phone: "13800138041" });
+  assert.equal(send.status, 503);
+  assert.equal(send.data.error, "login_closed");
+  assert.equal((await app.request("POST", "/api/auth/session", { phone: "13800138041", code: "123456" })).data.error, "login_closed");
+  assert.equal((await app.request("POST", "/api/auth/password", { phone: "13800138041", password: "abc12345" })).data.error, "login_closed");
+  assert.equal((await app.request("GET", "/api/site")).data.settings.login, false, "the login page shows the not-open notice");
+
+  const ev = await createEvent(app);
+  const reg = await app.request("POST", "/api/events/" + ev.slug + "/register", { name: "陈总", phone: "13800138041", consent: true });
+  assert.equal(reg.status, 200, "signing up for events needs no login");
+  assert.equal((await app.request("GET", "/api/events/" + ev.slug + "/me")).data.member, null);
+});
