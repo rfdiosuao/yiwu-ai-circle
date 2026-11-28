@@ -5,9 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#17150f">
 <meta name="robots" content="noindex">
-<title>活动报名 · 义乌AI圈</title>
-<link rel="icon" type="image/png" href="/assets/img/logo-icon.png?v=2">
-<link rel="stylesheet" href="/assets/css/event.css?v=5">
+<title>活动报名</title>
+<link rel="stylesheet" href="/assets/css/event.css?v=6">
 </head>
 <body>
 <main class="ev" data-ev data-state="loading">
@@ -26,7 +25,6 @@
       <section class="ev__face ev__front" data-front aria-label="活动海报">
         <img class="ev__poster" data-poster alt="" hidden>
         <div class="ev__cover" data-cover>
-          <img class="ev__cover-logo" src="/assets/img/logo-light.png?v=2" alt="义乌AI圈">
           <h2 class="ev__cover-title" data-cover-title>活动报名</h2>
           <p class="ev__cover-sub" data-cover-sub></p>
           <p class="ev__cover-meta" data-cover-meta></p>
@@ -69,7 +67,7 @@
               <dl class="ev__member-info" data-member-info></dl>
               <p class="ev__form-error" data-quick-error role="alert"></p>
               <button class="ev__submit" type="button" data-quick>一键报名</button>
-              <p class="ev__member-note">点「一键报名」即表示同意义乌AI圈收集以上信息，仅用于本次活动报名、发送邀请函和后续联系。详见<a href="/legal.html#privacy" target="_blank" rel="noopener">《隐私政策》</a></p>
+              <p class="ev__member-note">点「一键报名」即表示同意<span data-org-name>主办方</span>收集以上信息，仅用于本次活动报名、发送邀请函和后续联系。<button class="ev__inline" type="button" data-privacy-open>个人信息说明</button></p>
               <button class="ev__textbtn" type="button" data-member-edit>修改报名信息</button>
             </div>
             <div class="ev__fields" data-fields>
@@ -104,8 +102,9 @@
             <div class="ev__consent">
               <label class="ev__check">
                 <input type="checkbox" name="consent" aria-describedby="f-consent-err">
-                <span>我同意义乌AI圈收集以上信息，仅用于本次活动报名、发送邀请函和后续联系。详见<a href="/legal.html#privacy" target="_blank" rel="noopener">《隐私政策》</a></span>
+                <span>我同意<span data-org-name>主办方</span>收集以上信息，仅用于本次活动报名、发送邀请函和后续联系。</span>
               </label>
+              <button class="ev__inline" type="button" data-privacy-open>个人信息说明</button>
               <p class="ev__err" id="f-consent-err"></p>
             </div>
 
@@ -134,16 +133,24 @@
             <b>温馨提示</b>
             <p data-notice-text></p>
           </aside>
+
+          <details class="ev__privacy" data-privacy>
+            <summary>个人信息说明</summary>
+            <ul>
+              <li><b>收集什么：</b>你填写的称呼、手机号，以及这场活动需要的邮箱、公司 / 档口、项目或需求。</li>
+              <li><b>用来做什么：</b>只用于本次活动的报名确认、发送邀请函（留了邮箱时）和活动相关的联系，不用于和本次活动无关的推广，也不会出售。</li>
+              <li><b>谁能看到：</b>只有<span data-org-name>主办方</span>的活动工作人员。</li>
+              <li><b>保存多久：</b>保存到活动相关事务办完为止，之后删除。需要查询、更正或删除你的报名信息，可以联系<span data-org-name>主办方</span><span data-privacy-contact></span>。</li>
+            </ul>
+          </details>
         </div>
       </section>
     </div>
   </div>
 
   <div class="ev__missing" data-missing hidden>
-    <img src="/assets/img/logo.png?v=2" alt="义乌AI圈">
     <h1>活动不存在或已下线</h1>
-    <p>链接可能已经失效，可以去首页看看最新活动。</p>
-    <a class="ev__ghost" href="/">去首页</a>
+    <p>报名链接可能已经失效，请联系活动主办方获取新的报名二维码。</p>
   </div>
 
 </main>
@@ -171,8 +178,8 @@
 <div class="ev__toast" data-toast role="status" aria-live="polite"></div>
 
 <audio data-audio loop preload="none"></audio>
-<script src="/assets/js/invite.js?v=6" defer></script>
-<script src="/assets/js/invite-tech.js?v=3" defer></script>
-<script src="/assets/js/event.js?v=6" defer></script>
+<script src="/assets/js/invite.js?v=7" defer></script>
+<script src="/assets/js/invite-tech.js?v=4" defer></script>
+<script src="/assets/js/event.js?v=7" defer></script>
 </body>
 </html>

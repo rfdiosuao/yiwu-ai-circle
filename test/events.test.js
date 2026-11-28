@@ -224,7 +224,7 @@ test("leads are admin-only, follow-up is audited and CSV export is Excel-safe", 
 test("events carry host, sponsor lists and invitation settings; the public QR points at PUBLIC_URL", async t => {
   const app = await start(t);
   const ev = await createEvent(app);
-  assert.equal(ev.host, "义乌AI圈", "new events default to the platform as host");
+  assert.equal(ev.host, "", "new events start without a host, so no platform name shows on the sign-up page");
   assert.deepEqual(ev.invite, { enabled: true, style: "crimson", message: "", greeting: "", signature: "", date: "" });
 
   const patch = body => app.request("PATCH", "/api/admin/events/" + ev.id, body, app.admin);

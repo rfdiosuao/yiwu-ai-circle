@@ -1,8 +1,8 @@
 /* ==========================================================================
-   义乌AI圈 · 科技蓝长图（邀请函样式 tech，也用作「活动长图海报」）
+   科技蓝长图（邀请函样式 tech，也用作「活动长图海报」）。图上不放平台 Logo，只放主办协办 Logo。
    深蓝底、光带、发光立体标题，按内容自动排成一张 1080 宽的长图：
      Logo 与城市标识 → 系列名 / 年份 → 大标题 → 主题标语 → 主视觉 → 引言或邀请信 → 组织单位
-     → 活动信息 → 流程安排 → 议题 → 报名方式（席位、二维码、咨询电话）→ 温馨提示 → Logo
+     → 活动信息 → 流程安排 → 议题 → 报名方式（席位、二维码、咨询电话）→ 温馨提示
      →（实景照片铺底 + 底部标语）
    没填的板块不画。主视觉用后台上传的图，没有就用代码画的光效舞台。
    比经典邀请函多用到的数据：poster（true = 不带信的海报）、greeting（通用抬头）、signature、signDate、
@@ -198,7 +198,7 @@
 
   /* ---------------- 标题 ---------------- */
 
-  /* 「义乌AI圈 · 春季选品对接会」拆成系列名（顶部飘带）和大标题 */
+  /* 「2026 义乌 · 某某大会」拆成系列名（顶部飘带）和大标题 */
   function splitTitle(t) {
     var m = String(t || "").match(/^(.{2,16}?)\s*[·•｜|—:：]\s*(.{2,})$/);
     return m ? [m[1].trim(), m[2].trim()] : null;
@@ -1198,7 +1198,8 @@
   function signature(ctx, d, y) {
     var today = new Date();
     var date = d.signDate || (today.getFullYear() + "年" + (today.getMonth() + 1) + "月" + today.getDate() + "日");
-    var text = d.signature || (String(d.host || "义乌AI圈") + "  敬邀");
+    var host = String(d.host || "").trim();
+    var text = d.signature || (host ? host + "  敬邀" : "敬邀");
     ctx.textAlign = "right";
     ctx.textBaseline = "alphabetic";
     var sig = U.fitLine(ctx, text, IW, 36, 26, 700, SANS);
@@ -1553,10 +1554,15 @@
       y += Math.round(kf.size * 0.3);
       tf = titleFit(ctx, title, 112, 68);
     } else {
-      var kicker = parts ? parts[0] : String(d.host || "义乌AI圈");
-      var kfit = U.fitLine(ctx, kicker, 640, 38, 26, 700, SANS);
-      if (!dry) ribbonLabel(ctx, kfit.text, kfit.size, y + 20);
-      y += 80;
+      /* 顶部飘带写主办方；没填主办方就不画飘带 */
+      var kicker = parts ? parts[0] : String(d.host || "").trim();
+      if (kicker) {
+        var kfit = U.fitLine(ctx, kicker, 640, 38, 26, 700, SANS);
+        if (!dry) ribbonLabel(ctx, kfit.text, kfit.size, y + 20);
+        y += 80;
+      } else {
+        y += 20;
+      }
       tf = titleFit(ctx, title);
     }
     y += Math.round(tf.size * 0.98);
@@ -1631,15 +1637,6 @@
 
     if (d.notice) y = noticeSection(ctx, d.notice, y + 30, dry) + 70;
 
-    if (A.logo) {
-      var lh = 64;
-      var lw = Math.round(A.logo.width * lh / A.logo.height);
-      if (!dry) {
-        hline(ctx, PL, PR, y, "120, 175, 255", 0.5, 1.5);
-        ctx.drawImage(A.logo, CX - lw / 2, y + 44, lw, lh);
-      }
-      y += 44 + lh;
-    }
 
     if (bottom) {
       var top = y + 10;
@@ -1660,8 +1657,8 @@
 
   function renderTech(d) {
     var logoUrls = (Array.isArray(d.logoUrls) ? d.logoUrls : []).slice(0, 6);
-    return Promise.all([U.loadImage(d.logoUrl), U.loadImage(d.visualUrl)].concat(logoUrls.map(U.loadImage))).then(function (imgs) {
-      var A = { logo: imgs[0], visual: imgs[1], logos: imgs.slice(2).filter(Boolean) };
+    return Promise.all([U.loadImage(d.visualUrl)].concat(logoUrls.map(U.loadImage))).then(function (imgs) {
+      var A = { visual: imgs[0], logos: imgs.slice(1).filter(Boolean) };
       var probe = document.createElement("canvas");
       probe.width = W;
       probe.height = 4;

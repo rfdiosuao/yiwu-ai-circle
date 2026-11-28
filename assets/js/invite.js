@@ -1,5 +1,5 @@
 /* ==========================================================================
-   义乌AI圈 · 专属邀请函
+   活动邀请函
    报名成功后按访客的称呼在浏览器里画一张邀请函（1080 宽的 JPG），
    可以长按保存、发给朋友或朋友圈。底部二维码指向报名页，扫码的人也能报名。
 
@@ -642,10 +642,10 @@
 
     /* 落款 + 印章 */
     y += 20;
-    var host = String(d.host || "义乌AI圈");
+    var host = String(d.host || "").trim();
     ctx.textAlign = "right";
     var sigR = R - 138;
-    var sig = fitLine(ctx, d.signature || host + "  敬邀", sigR - L - 40, 44, 26, 700, SERIF);
+    var sig = fitLine(ctx, d.signature || (host ? host + "  敬邀" : "敬邀"), sigR - L - 40, 44, 26, 700, SERIF);
     ctx.font = font(700, sig.size, SERIF);
     ctx.fillStyle = goldFill(ctx, y - sig.size, y + 8);
     ctx.fillText(sig.text, sigR, y);
@@ -739,8 +739,7 @@
       logoUrls: ev.logoUrls || [],
       contact: ev.contact,
       slogan: ev.slogan,
-      capacity: ev.capacity,
-      logoUrl: "/assets/img/logo-light.png?v=2"
+      capacity: ev.capacity
     };
   }
 
