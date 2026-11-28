@@ -24,10 +24,10 @@
 
   function fmtDate(v) {
     if (!v) return "时间待定";
-    var d = new Date(v);
+    var d = new Date(v + ":00Z");
     if (isNaN(d.getTime())) return "时间待定";
-    return (d.getMonth() + 1) + "月" + d.getDate() + "日 周" + "日一二三四五六".charAt(d.getDay()) + " " +
-      String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+    return (d.getUTCMonth() + 1) + "月" + d.getUTCDate() + "日 周" + "日一二三四五六".charAt(d.getUTCDay()) + " " +
+      String(d.getUTCHours()).padStart(2, "0") + ":" + String(d.getUTCMinutes()).padStart(2, "0");
   }
 
   /* ---------------- 活动卡片 ---------------- */

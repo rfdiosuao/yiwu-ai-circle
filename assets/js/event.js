@@ -33,6 +33,8 @@
   var STORE_KEY = "ywai.ev." + slug;
   var MUSIC_KEY = "ywai.ev.music." + slug;
   var ev = null;
+  var receipt = loadReceipt();
+  var registration = null;
   var flipped = false;
   var member = null;       /* 已登录会员的报名资料：{ phone（打码）, name, email, company } */
   var memberMode = false;  /* 用登录账号报名：手机号不可改，以账号为准 */
@@ -64,20 +66,20 @@
   /* 有结束时间：同一天写成 14:00-17:00，跨天写成「至 12月21日（周一）17:00」 */
   function withEnd(text, start, end) {
     if (!text || !end) return text;
-    var a = new Date(start);
-    var b = new Date(end);
+    var a = new Date(start + ":00Z");
+    var b = new Date(end + ":00Z");
     if (isNaN(b.getTime()) || b <= a) return text;
-    var hm = String(b.getHours()).padStart(2, "0") + ":" + String(b.getMinutes()).padStart(2, "0");
-    return text + (a.toDateString() === b.toDateString() ? "-" + hm : " 至 " + fmtTime(end));
+    var hm = String(b.getUTCHours()).padStart(2, "0") + ":" + String(b.getUTCMinutes()).padStart(2, "0");
+    return text + (start.slice(0, 10) === end.slice(0, 10) ? "-" + hm : " 至 " + fmtTime(end));
   }
 
   function fmtTime(v) {
     if (!v) return "";
-    var d = new Date(v);
+    var d = new Date(v + ":00Z");
     if (isNaN(d.getTime())) return "";
-    var week = "日一二三四五六".charAt(d.getDay());
-    return (d.getMonth() + 1) + "月" + d.getDate() + "日（周" + week + "）" +
-      String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+    var week = "日一二三四五六".charAt(d.getUTCDay());
+    return (d.getUTCMonth() + 1) + "月" + d.getUTCDate() + "日（周" + week + "）" +
+      String(d.getUTCHours()).padStart(2, "0") + ":" + String(d.getUTCMinutes()).padStart(2, "0");
   }
 
   var toastTimer = null;
@@ -88,9 +90,16 @@
     toastTimer = setTimeout(function () { toastEl.classList.remove("is-on"); }, 2600);
   }
 
-  function saved() {
-    try { return JSON.parse(localStorage.getItem(STORE_KEY) || "null"); } catch (e) { return null; }
+  function loadReceipt() {
+    try {
+      var value = localStorage.getItem(STORE_KEY);
+      if (/^[A-Za-z0-9_-]{43}$/.test(value || "")) return value;
+      if (value !== null) localStorage.removeItem(STORE_KEY);
+    } catch (e) {}
+    return "";
   }
+
+  function saved() { return registration; }
 
   function api(method, url, body) {
     return fetch(url, {
@@ -252,6 +261,8 @@
   });
 
   function submitSignup(v, btn, errEl) {
+    if (btn.disabled) return;
+    if (receipt) v.receipt = receipt;
     var label = btn.textContent;
     btn.disabled = true;
     btn.textContent = "提交中…";
@@ -259,11 +270,9 @@
       btn.disabled = false;
       btn.textContent = label;
       if (r.ok) {
-        try {
-          localStorage.setItem(STORE_KEY, JSON.stringify({
-            name: v.name, phone: v.account && member ? member.phone : v.phone, email: v.email, company: v.company, project: v.project, at: Date.now()
-          }));
-        } catch (err) {}
+        receipt = r.receipt;
+        registration = r.registration;
+        try { localStorage.setItem(STORE_KEY, receipt); } catch (err) {}
         if (member) ["name", "email", "company"].forEach(function (k) { if (v[k]) member[k] = v[k]; });
         showDone(r.updated, r.mail === "queued" ? v.email : "");
         return;
@@ -328,17 +337,20 @@
     showMemberCard(false);
   }
 
-  function loadMember() {
-    api("GET", "/api/events/" + encodeURIComponent(slug) + "/me").then(function (r) {
-      if (!r.ok || !r.member) return;
-      member = r.member;
-      memberMode = true;
-      /* 这个账号已经报过名（比如换了手机或清了缓存）：照样显示「你已报名」 */
-      if (r.lead && !saved()) {
-        try { localStorage.setItem(STORE_KEY, JSON.stringify(Object.assign({ phone: member.phone, at: Date.now() }, r.lead))); } catch (err) {}
+  function loadRegistration() {
+    var endpoint = "/api/events/" + encodeURIComponent(slug);
+    var guest = receipt
+      ? api("POST", endpoint + "/registration", { receipt: receipt })
+      : Promise.resolve({});
+    return Promise.all([api("GET", endpoint + "/me"), guest]).then(function (results) {
+      var account = results[0];
+      if (account.ok && account.member) {
+        member = account.member;
+        memberMode = true;
+        registration = account.lead;
+      } else if (results[1].ok) {
+        registration = results[1].registration;
       }
-      applyMember();
-      paintState();
     });
   }
 
@@ -384,7 +396,7 @@
   });
 
   $("[data-share]").addEventListener("click", function () {
-    var url = location.origin + "/e/" + slug;
+    var url = ev.url;
     if (/MicroMessenger/i.test(navigator.userAgent)) {
       toast("点右上角「···」发送给朋友");
       return;
@@ -566,7 +578,7 @@
   function paintState() {
     var info = STATE_TEXT[ev.state] || STATE_TEXT.closed;
     var s = saved();
-    var canSubmit = ev.state === "open" || ev.state === "draft";
+    var canSubmit = ev.state === "open" || ev.state === "draft" || (ev.state === "full" && Boolean(s));
     ctaBtn.disabled = false;
     ctaLabel.textContent = s && canSubmit ? "已报名 · 查看" : info.cta;
     $("[data-closed]").hidden = canSubmit;
@@ -645,8 +657,8 @@
       paintMusic();
       startMusic();
     }
+    if (member) applyMember();
     paintState();
-    loadMember();
     $("[data-email-hint]").hidden = !ev.mailInvite;
     if (params.get("poster")) openInvite("poster");
     else if (ev.invite && params.get("invite")) openInvite("letter");
@@ -666,6 +678,7 @@
   api("GET", "/api/events/" + encodeURIComponent(slug)).then(function (r) {
     if (!r.ok || !r.event) { missing(); return; }
     ev = r.event;
-    render();
+    if (ev.state === "draft") render();
+    else loadRegistration().then(render);
   });
 })();

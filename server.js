@@ -95,8 +95,18 @@ const DEMO_CODE = conf("DEMO_CODE");
 const SMS_SEND_URL = conf("SMS_SEND_URL").trim();
 const SMS_VERIFY_URL = conf("SMS_VERIFY_URL").trim();
 
-/* 对外访问地址（二维码里的链接用它）；不填则按请求的 Host 推断 */
-const PUBLIC_URL = conf("PUBLIC_URL").trim().replace(/\/+$/, "");
+/* 生产的活动链接、二维码和邮件链接统一使用配置的站点源。 */
+const PUBLIC_URL_SETTING = conf("PUBLIC_URL").trim();
+function siteOrigin(value) {
+  if (!/^https?:\/\//i.test(value) || value.length > 300) return "";
+  try {
+    const url = new URL(value);
+    return url.pathname === "/" && !url.username && !url.password && !url.search && !url.hash ? url.origin : "";
+  } catch {
+    return "";
+  }
+}
+const PUBLIC_URL = siteOrigin(PUBLIC_URL_SETTING);
 
 /* 发邮件（报名后把邀请函发到报名人邮箱）；不配 SMTP_HOST 就不发 */
 const mailer = createMailer({
@@ -1551,11 +1561,12 @@ route("DELETE", /^\/api\/admin\/applications\/(u_[a-f0-9]{24})$/, function (req,
 /* --- 活动报名与客资 --- */
 function publicBase(req) {
   if (PUBLIC_URL) return PUBLIC_URL;
-  return (requestIsHttps(req) ? "https" : "http") + "://" + String(req.headers.host || "localhost");
+  const scheme = requestIsHttps(req) ? "https://" : "http://";
+  return siteOrigin(scheme + (req.headers.host || "localhost")) || scheme + "localhost";
 }
 const eventsModule = installEvents({
   route, db, store, sendJSON, fail, withBody, isAdmin, audit, rateLimited, clientIp, isValidPhone, str,
-  dataDir: DATA_DIR, publicBase, mailer, currentUser
+  dataDir: DATA_DIR, publicBase, configuredPublicBase: PUBLIC_URL, mailer, currentUser
 });
 installPartners({ route, db, store, sendJSON, fail, withBody, isAdmin, audit, str, uploadUrl: eventsModule.uploadUrl });
 
@@ -1625,6 +1636,8 @@ const server = http.createServer(function (req, res) {
 const configurationErrors = [];
 if (!["api", "demo", "off"].includes(SMS_MODE)) configurationErrors.push("SMS_MODE (api / demo / off)");
 configurationErrors.push(...mailer.problems(IS_PRODUCTION));
+if (PUBLIC_URL_SETTING && !PUBLIC_URL) configurationErrors.push("PUBLIC_URL (site origin only)");
+if (IS_PRODUCTION && !PUBLIC_URL.startsWith("https://")) configurationErrors.push("PUBLIC_URL (HTTPS site origin)");
 if (IS_PRODUCTION) {
   if (!SESSION_SECRET_CONFIGURED || Buffer.byteLength(SESSION_SECRET) < 32) configurationErrors.push("SESSION_SECRET (32+ random bytes)");
   if (COOKIE_SECURE !== "1") configurationErrors.push("COOKIE_SECURE=1");

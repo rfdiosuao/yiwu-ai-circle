@@ -15,11 +15,12 @@ const adminPassword = crypto.randomBytes(20).toString("hex");
 const PNG = Buffer.from("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da63f8ffff3f0005fe02fea7d8a8a70000000049454e44ae426082", "hex");
 const MP3 = Buffer.concat([Buffer.from("ID3"), Buffer.alloc(4000, 7)]);
 
-async function start(t, extraEnv) {
+async function start(t, extraEnv, prepare) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "yiwu-events-"));
   const env = { ...process.env, NODE_ENV: "development", PORT: "0", HOST: "127.0.0.1", DATA_DIR: dir,
     SESSION_SECRET: crypto.randomBytes(32).toString("hex"), ADMIN_USER: "events-admin", ADMIN_PASS: adminPassword,
-    SMS_MODE: "demo", COOKIE_SECURE: "0", TRUST_PROXY: "0", PUBLIC_URL: "https://ywai.example.com", ...(extraEnv || {}) };
+    SMS_MODE: "demo", COOKIE_SECURE: "0", TRUST_PROXY: "0", TZ: "UTC", PUBLIC_URL: "https://ywai.example.com", ...(extraEnv || {}) };
+  if (prepare) prepare(dir);
   let log = "";
   const child = spawn(process.execPath, ["server.js"], { cwd: root, env, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
   child.stderr.on("data", c => { log += c; });
@@ -141,6 +142,8 @@ test("admins create events from uploads; drafts stay private; QR points at PUBLI
   const draft = await createEvent(app, { status: "draft" });
   assert.equal(draft.url, "https://ywai.example.com/e/" + draft.slug);
   assert.equal((await app.request("GET", "/api/events/" + draft.slug)).status, 404);
+  assert.equal((await app.request("HEAD", draft.posterUrl)).status, 404);
+  assert.equal((await app.request("HEAD", draft.posterUrl, undefined, app.admin)).status, 200);
   assert.equal((await app.request("GET", "/api/events/" + draft.slug, undefined, app.admin)).status, 200);
   assert.equal((await app.request("POST", "/api/events/" + draft.slug + "/register", { phone: "13900001111", name: "王", consent: true })).status, 404);
 
@@ -176,13 +179,20 @@ test("registration validates, de-duplicates by phone and respects capacity and s
   assert.equal(invalid.status, 400);
   assert.deepEqual(Object.keys(invalid.data.errors).sort(), ["consent", "name", "phone"]);
 
-  assert.deepEqual((await reg({ phone: "13900001111", name: "王老板", company: "三立注塑", project: "找中东物流", consent: true })).data, { ok: true, updated: false, mail: "" });
-  assert.deepEqual((await reg({ phone: "139 0000 1111", name: "王总", consent: true })).data, { ok: true, updated: true, mail: "" });
-  assert.equal((await reg({ phone: "13900002222", name: "李姐", consent: true })).status, 200);
+  const first = await reg({ phone: "13900001111", name: "王老板", company: "三立注塑", project: "找中东物流", consent: true });
+  assert.equal(first.data.updated, false);
+  assert.match(first.data.receipt, /^[A-Za-z0-9_-]{43}$/);
+  const second = await reg({ phone: "13900002222", name: "李姐", consent: true });
+  assert.equal(second.status, 200);
   const full = await reg({ phone: "13900003333", name: "赵", consent: true });
   assert.equal(full.status, 409);
   assert.equal(full.data.error, "event_full");
-  assert.equal((await reg({ phone: "13900002222", name: "李总", consent: true })).status, 200);
+  const edit = { phone: "139 0000 1111", name: "王总", consent: true };
+  assert.equal((await reg(edit)).data.error, "registration_not_editable");
+  assert.equal((await reg({ ...edit, receipt: second.data.receipt })).data.error, "registration_not_editable");
+  assert.equal((await reg({ ...edit, receipt: first.data.receipt })).data.updated, true);
+  const lookup = await app.request("POST", "/api/events/" + ev.slug + "/registration", { receipt: first.data.receipt });
+  assert.deepEqual(lookup.data.registration, { name: "王总" });
 
   const leads = (await app.request("GET", "/api/admin/leads?event=" + ev.id, undefined, app.admin)).data.leads;
   assert.equal(leads.length, 2);
@@ -190,6 +200,7 @@ test("registration validates, de-duplicates by phone and respects capacity and s
   assert.equal(wang.name, "王总");
   assert.equal(wang.company, "三立注塑", "blank fields on a repeat submission keep earlier answers");
   assert.equal(wang.submits, 2);
+  assert.equal(wang.receiptHash, undefined);
 
   assert.equal((await app.request("PATCH", "/api/admin/events/" + ev.id, { status: "closed" }, app.admin)).status, 200);
   assert.equal((await reg({ phone: "13900001111", name: "王", consent: true })).data.error, "event_closed");
@@ -445,8 +456,8 @@ test("sign-up with an email sends the event invitation by mail; resends are dedu
   assert.equal(lead.email, "chen@example.com");
 
   /* 同一个邮箱再提交不重发；换邮箱才发 */
-  assert.equal((await reg({ name: "陈总", phone: "13800138011", email: "CHEN@example.com" })).data.mail, "");
-  assert.equal((await reg({ name: "陈总", phone: "13800138011", email: "chen2@example.com" })).data.mail, "queued");
+  assert.equal((await reg({ name: "陈总", phone: "13800138011", email: "CHEN@example.com", receipt: ok.data.receipt })).data.mail, "");
+  assert.equal((await reg({ name: "陈总", phone: "13800138011", email: "chen2@example.com", receipt: ok.data.receipt })).data.mail, "queued");
   assert.ok(await until(() => smtp.mails.length === 2));
   assert.deepEqual(smtp.mails[1].rcpt, ["<chen2@example.com>"]);
 
@@ -467,6 +478,37 @@ test("sign-up with an email sends the event invitation by mail; resends are dedu
   assert.equal((await reg({ name: "王总", phone: "13800138012", email: "wang@example.com" })).data.mail, "");
   await new Promise(r => setTimeout(r, 300));
   assert.equal(smtp.mails.length, 3);
+});
+
+test("a restarted process delivers an invitation already saved as queued", async t => {
+  const smtp = await fakeSmtp(t);
+  const app = await start(t, {
+    SMTP_HOST: "127.0.0.1", SMTP_PORT: String(smtp.port), SMTP_SECURE: "none",
+    SMTP_FROM: "bot@example.com", SMTP_USER: "bot@example.com", SMTP_PASS: "fake-password"
+  }, dir => {
+    const event = { id: "ev_resume", slug: "restart", title: "重启恢复", status: "open" };
+    const lead = { id: "ld_resume", eventId: event.id, email: "review@example.com",
+      mail: { status: "queued", to: "review@example.com", at: Date.now() } };
+    fs.writeFileSync(path.join(dir, "db.json"), JSON.stringify({ events: { [event.id]: event }, leads: [lead] }));
+  });
+  assert.ok(await until(() => smtp.mails[0]));
+  assert.deepEqual(smtp.mails[0].rcpt, ["<review@example.com>"]);
+  const lead = await until(async () => {
+    const { data } = await app.request("GET", "/api/admin/leads", undefined, app.admin);
+    return data.leads.find(l => l.mail.status === "sent");
+  });
+  assert.ok(lead);
+});
+
+test("an activity deadline is evaluated in Beijing time on a UTC server", async t => {
+  const app = await start(t);
+  const wall = minutes => new Date(Date.now() + (480 + minutes) * 60_000).toISOString().slice(0, 16);
+  const expired = await createEvent(app, { deadline: wall(-15) });
+  const future = await createEvent(app, { deadline: wall(15) });
+  assert.equal(expired.state, "deadline");
+  assert.equal(future.state, "open");
+  const invalid = await app.request("PATCH", "/api/admin/events/" + future.id, { deadline: "2028-02-30T14:00" }, app.admin);
+  assert.equal(invalid.status, 400);
 });
 
 test("without SMTP nothing is mailed, and production refuses plaintext SMTP", async t => {

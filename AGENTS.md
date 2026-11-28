@@ -22,6 +22,6 @@
 ## 运行约定
 
 - Node.js >= 20，`npm start` 启动服务。
-- 生产环境必须配置 `NODE_ENV=production`、`SESSION_SECRET`、`ADMIN_USER`、`ADMIN_PASS`、真实短信接口和 `COOKIE_SECURE=1`。
+- 生产环境必须配置 `NODE_ENV=production`、`SESSION_SECRET`、`ADMIN_USER`、`ADMIN_PASS`、`COOKIE_SECURE=1` 和 HTTPS `PUBLIC_URL`。短信未开通时可配置 `SMS_MODE=off`。
 - 临时数据、Cookie、日志放在系统临时目录，完成后清理；不要把运行数据写入 Git。
 - 不提交密钥、个人联系方式或真实支付信息。

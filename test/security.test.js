@@ -32,7 +32,7 @@ async function start(t, extra = {}, existingDir) {
   const dir = existingDir || fs.mkdtempSync(path.join(os.tmpdir(), "yiwu-security-"));
   const env = { ...process.env, NODE_ENV: "development", PORT: "0", HOST: "127.0.0.1",
     DATA_DIR: dir, SESSION_SECRET: secret, ADMIN_USER: "review-admin", ADMIN_PASS: adminPassword,
-    SMS_MODE: "demo", COOKIE_SECURE: "0", TRUST_PROXY: "0", ...extra };
+    SMS_MODE: "demo", COOKIE_SECURE: "0", TRUST_PROXY: "0", PUBLIC_URL: "https://ywai.example.com", ...extra };
   let log = "";
   const child = spawn(process.execPath, ["server.js"], { cwd: root, env, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
   child.stderr.on("data", c => { log += c; });
