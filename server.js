@@ -16,6 +16,7 @@ const net = require("node:net");
 const { validAdminDoc, validMerchant } = require("./lib/admin-document");
 const installEvents = require("./lib/events");
 const installPartners = require("./lib/partners");
+const { createMailer } = require("./lib/mailer");
 const { createStore } = require("./lib/store");
 const adminSeed = require("./lib/admin-seed");
 
@@ -95,6 +96,12 @@ const SMS_VERIFY_URL = conf("SMS_VERIFY_URL").trim();
 
 /* 对外访问地址（二维码里的链接用它）；不填则按请求的 Host 推断 */
 const PUBLIC_URL = conf("PUBLIC_URL").trim().replace(/\/+$/, "");
+
+/* 发邮件（报名后把邀请函发到报名人邮箱）；不配 SMTP_HOST 就不发 */
+const mailer = createMailer({
+  host: conf("SMTP_HOST"), port: conf("SMTP_PORT"), secure: conf("SMTP_SECURE"),
+  user: conf("SMTP_USER"), pass: conf("SMTP_PASS"), from: conf("SMTP_FROM")
+});
 
 const ADMIN_USER = conf("ADMIN_USER");
 const ADMIN_PASS = conf("ADMIN_PASS");
@@ -1540,7 +1547,7 @@ function publicBase(req) {
 }
 const eventsModule = installEvents({
   route, db, store, sendJSON, fail, withBody, isAdmin, audit, rateLimited, clientIp, isValidPhone, str,
-  dataDir: DATA_DIR, publicBase
+  dataDir: DATA_DIR, publicBase, mailer
 });
 installPartners({ route, db, store, sendJSON, fail, withBody, isAdmin, audit, str, uploadUrl: eventsModule.uploadUrl });
 
@@ -1609,6 +1616,7 @@ const server = http.createServer(function (req, res) {
 
 const configurationErrors = [];
 if (!["api", "demo"].includes(SMS_MODE)) configurationErrors.push("SMS_MODE");
+configurationErrors.push(...mailer.problems(IS_PRODUCTION));
 if (IS_PRODUCTION) {
   if (!SESSION_SECRET_CONFIGURED || Buffer.byteLength(SESSION_SECRET) < 32) configurationErrors.push("SESSION_SECRET (32+ random bytes)");
   if (COOKIE_SECURE !== "1") configurationErrors.push("COOKIE_SECURE=1");
@@ -1627,7 +1635,7 @@ if (configurationErrors.length) {
 initAdminDoc();
 server.listen(PORT, HOST, function () {
   console.log("[yiwu-ai-circle] http://" + HOST + ":" + server.address().port);
-  console.log("[yiwu-ai-circle] payment=" + Boolean(WAG_API_KEY && WAG_ENTITLEMENT_ID) + " sms=" + SMS_MODE + " admin=" + adminAccount().source);
+  console.log("[yiwu-ai-circle] payment=" + Boolean(WAG_API_KEY && WAG_ENTITLEMENT_ID) + " sms=" + SMS_MODE + " mail=" + mailer.configured + " admin=" + adminAccount().source);
 });
 
 function shutdown() {
