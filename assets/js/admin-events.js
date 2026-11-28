@@ -139,8 +139,10 @@
     html: function () {
       return '<div class="ahead">' +
         '<div><div class="ahead__kicker"><b>10</b><span>活动运营</span></div>' +
-        '<h1>活动报名</h1><p class="ahead__sub">每场活动一个报名页：扫码看海报、翻面填表，提交的信息直接进入「客资」。不用登录，也不用检票。</p></div>' +
-        '<div class="ahead__actions"><button class="btn btn--sm btn--red" type="button" data-act="ev:new">新建活动</button></div></div>' +
+        '<h1>活动报名</h1><p class="ahead__sub">每场活动一个报名页：扫码看海报、翻面填表，提交的信息直接进入「客资」。不用登录，也不用检票。「导出」把一场活动打包成文件，可以在另一台服务器上「导入活动」。</p></div>' +
+        '<div class="ahead__actions"><button class="btn btn--sm btn--ghost" type="button" data-act="ev:import">导入活动</button>' +
+        '<input type="file" id="evImportFile" accept="application/json,.json" hidden>' +
+        '<button class="btn btn--sm btn--red" type="button" data-act="ev:new">新建活动</button></div></div>' +
         '<div class="panel"><div class="tbl-wrap"><table class="tbl"><thead><tr>' +
         "<th>活动</th><th>时间</th><th>状态</th><th>报名</th><th>链接</th><th style=\"text-align:right\">操作</th>" +
         '</tr></thead><tbody id="evBody"><tr class="is-static"><td colspan="6"><div class="aempty">加载中…</div></td></tr></tbody></table></div></div>';
@@ -174,6 +176,7 @@
           '<a class="row-btn" href="/e/' + esc(e.slug) + '" target="_blank" rel="noopener">' + (e.status === "draft" ? "预览" : "打开") + "</a>" +
           (e.invite && e.invite.enabled !== false ? '<a class="row-btn" href="/e/' + esc(e.slug) + '?invite=letter" target="_blank" rel="noopener">邀请函</a>' : "") +
           '<a class="row-btn" href="/e/' + esc(e.slug) + '?poster=1" target="_blank" rel="noopener">长图海报</a>' +
+          '<a class="row-btn" href="/api/admin/events/' + e.id + '/export" download title="导出成文件，可以导入到另一台服务器">导出</a>' +
           '<button class="row-btn" type="button" data-act="ev:edit" data-id="' + e.id + '">编辑</button>' +
           "</div></td></tr>";
       }).join("");
@@ -490,6 +493,35 @@
   }
 
   UI.ACTIONS["ev:new"] = function () { openEvent(null); };
+
+  /* ---------------- 导入活动（从另一台服务器导出的文件） ---------------- */
+  UI.ACTIONS["ev:import"] = function () {
+    var input = document.getElementById("evImportFile");
+    if (input) { input.value = ""; input.click(); }
+  };
+
+  function importEvent(file) {
+    if (!file) return;
+    if (file.size > 40 * 1024 * 1024) { toast("文件超过 40MB，导入不了"); return; }
+    var reader = new FileReader();
+    reader.onload = function () {
+      var data;
+      try { data = JSON.parse(String(reader.result)); } catch (err) { toast("文件读不出来，请选从后台「导出」的 .json 文件"); return; }
+      toast("正在导入「" + ((data.event && data.event.title) || file.name) + "」…");
+      req("POST", "/api/admin/events/import", data).then(function (r) {
+        if (!r.ok) { toast(r.message || "导入失败"); return; }
+        toast(r.slugKept ? "已导入为草稿，链接和原来一样：/e/" + r.event.slug : "已导入为草稿，原链接已被占用，新链接：/e/" + r.event.slug);
+        loadEvents().then(function () {
+          UI.render();
+          /* 顺便生成发邮件用的邀请函图片 */
+          if (r.event.invite && r.event.invite.enabled !== false) makeMailImage(r.event, true);
+          openEvent(r.event.id);
+        });
+      });
+    };
+    reader.onerror = function () { toast("读取文件失败"); };
+    reader.readAsText(file);
+  }
   UI.ACTIONS["ev:edit"] = function (id) { openEvent(id); };
   UI.ACTIONS["ev:qr"] = function (id) { var e = eventOf(id); if (e) openQr(e); };
   UI.ACTIONS["ev:png"] = function (id) { var e = eventOf(id); if (e) downloadPng(e); };
@@ -676,6 +708,10 @@
         toast("跟进状态已更新");
         loadEvents();
       });
+      return;
+    }
+    if (e.target.id === "evImportFile") {
+      importEvent(e.target.files && e.target.files[0]);
       return;
     }
     if (e.target.id === "ldEvent") {

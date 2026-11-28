@@ -550,3 +550,61 @@ test("production can launch with member login off (SMS_MODE=off) while event sig
   assert.equal(reg.status, 200, "signing up for events needs no login");
   assert.equal((await app.request("GET", "/api/events/" + ev.slug + "/me")).data.member, null);
 });
+
+test("an event can be exported to a file and imported on another server as a draft, files included", async t => {
+  const from = await start(t);
+  const ev = await createEvent(from, { endAt: "2026-12-20T17:30", contact: "13800001234（李女士）", slogan: "示例标语", capacity: 200, visualAt: "bottom" });
+  const up = async name => (await from.request("POST", "/api/admin/uploads", { name, kind: "image", data: PNG.toString("base64") }, from.admin)).data.upload.id;
+  const logos = [await up("a.png"), await up("b.png")];
+  const visual = await up("kv.png");
+  const patched = await from.request("PATCH", "/api/admin/events/" + ev.id, {
+    logos, visual, orgs: [{ label: "协办单位", names: "示例研究院" }],
+    talks: [{ title: "核心议题一" }], agenda: [{ time: "14:00", item: "开场" }], notice: "示例提示",
+    invite: { style: "tech", greeting: "各位家人们", message: "第一段\n第二段", signature: "示例协会秘书处", date: "2026-11-27" }
+  }, from.admin);
+  assert.equal(patched.status, 200);
+
+  assert.equal((await from.request("GET", "/api/admin/events/" + ev.id + "/export")).status, 401);
+  const exp = await fetch(from.base + "/api/admin/events/" + ev.id + "/export", { headers: { Cookie: from.admin } });
+  assert.equal(exp.status, 200);
+  assert.match(exp.headers.get("content-disposition"), /attachment; filename="event-.+\.json"/);
+  const file = await exp.json();
+  assert.equal(file.format, "yiwu-event");
+  assert.equal(file.files.logos.length, 2);
+  assert.ok(file.files.poster && file.files.music && file.files.visual);
+  assert.equal(file.event.leads, undefined, "registrations are never exported");
+
+  const to = await start(t);
+  assert.equal((await to.request("POST", "/api/admin/events/import", file)).status, 401);
+  assert.equal((await to.request("POST", "/api/admin/events/import", { format: "other" }, to.admin)).status, 400);
+  const broken = JSON.parse(JSON.stringify(file));
+  broken.files.logos[1].data = MP3.toString("base64");
+  const bad = await to.request("POST", "/api/admin/events/import", broken, to.admin);
+  assert.equal(bad.status, 400, "an audio file posing as a logo is rejected");
+  assert.equal(fs.readdirSync(path.join(to.dir, "uploads")).length, 0, "a failed import leaves no stray files");
+
+  const imp = await to.request("POST", "/api/admin/events/import", file, to.admin);
+  assert.equal(imp.status, 200, JSON.stringify(imp.data));
+  const got = imp.data.event;
+  assert.equal(imp.data.slugKept, true);
+  assert.equal(got.slug, ev.slug, "the printed QR keeps working");
+  assert.equal(got.status, "draft", "imports start as drafts");
+  for (const k of ["title", "place", "startAt", "endAt", "contact", "slogan", "capacity", "visualAt", "notice"]) assert.equal(got[k], patched.data.event[k], k);
+  assert.deepEqual(got.orgs, patched.data.event.orgs);
+  assert.deepEqual(got.talks, patched.data.event.talks);
+  assert.deepEqual(got.agenda, patched.data.event.agenda);
+  assert.deepEqual(got.invite, patched.data.event.invite);
+  assert.equal(got.logos.length, 2);
+  for (const u of [got.posterUrl, got.visualUrl, got.musicUrl, ...got.logos.map(l => l.url)]) {
+    assert.equal((await fetch(to.base + u)).status, 200, u);
+  }
+
+  /* 同一个文件再导入一次：链接后缀已被占用，换新的 */
+  const again = await to.request("POST", "/api/admin/events/import", file, to.admin);
+  assert.equal(again.status, 200);
+  assert.equal(again.data.slugKept, false);
+  assert.notEqual(again.data.event.slug, ev.slug);
+
+  const auditLog = (await to.request("GET", "/api/admin/audit", undefined, to.admin)).data.items.map(i => i.action);
+  assert.ok(auditLog.includes("导入活动"));
+});

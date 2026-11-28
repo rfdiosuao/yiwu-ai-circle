@@ -122,6 +122,7 @@ npm start
 | GET | `/api/events` | 前台活动列表：即将开始 / 往期（不含草稿、报名人数和内部 id） |
 | GET / POST | `/api/events/:slug`、`/api/events/:slug/register` | 活动报名页读取活动（含流程议题、邀请函设置和二维码点阵）/ 提交报名（无需登录，按 IP 和手机号限频；留了邮箱且已配置发信时返回 `mail: "queued"`） |
 | GET | `/api/events/:slug/me` | 已登录会员在这场活动的报名资料（手机号打码）和是否已报名；没登录返回 `member: null` |
+| GET / POST | `/api/admin/events/:id/export`、`/api/admin/events/import` | 把一场活动（设置、文字、图片、音乐，不含报名名单）导出成 JSON 文件 / 在另一台服务器导入（导入后是草稿，链接后缀没被占用就沿用） |
 | PUT | `/api/admin/events/:id/invite-image` | 上传发邮件用的邀请函图片（后台保存活动时自动调用），替换并删除旧图 |
 | POST | `/api/admin/leads/:id/mail` | 重发邀请函邮件 |
 | GET | `/api/partners` | 首页合作伙伴展示（只含名称、类型、Logo、链接、简介） |
