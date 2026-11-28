@@ -204,7 +204,7 @@
     if (!e) {
       e = {
         title: "", subtitle: "", startAt: "", endAt: "", place: "", intro: "", deadline: "", capacity: 0, status: "draft", slug: "",
-        host: "义乌AI圈", orgs: [], agenda: [], talks: [], notice: "", logos: [], visualAt: "top", contact: "", slogan: "",
+        host: "", orgs: [], agenda: [], talks: [], notice: "", logos: [], visualAt: "top", contact: "", slogan: "",
         invite: { enabled: true, style: "crimson", message: "", greeting: "", signature: "", date: "" },
         fields: { name: "required", email: "optional", company: "optional", project: "optional" }
       };
@@ -222,7 +222,7 @@
       sub: isNew ? "先存为草稿，上传海报后用「预览」检查，再改成「报名中」。" : e.leads + " 人报名 · " + (STATUS[e.status] || ""),
       wide: true,
       body: '<form id="drawerForm" class="dgrid">' +
-        field("活动标题", '<input class="input" name="title" value="' + esc(e.title) + '" maxlength="40" required placeholder="如：义乌AI圈 · 春季选品对接会">', "full") +
+        field("活动标题", '<input class="input" name="title" value="' + esc(e.title) + '" maxlength="40" required placeholder="如：2026 义乌 · 库存品行业AI出海创新大会">', "full") +
         field("副标题", '<input class="input" name="subtitle" value="' + esc(e.subtitle) + '" maxlength="80" placeholder="一句话说清楚来了能得到什么">', "full") +
         field("活动时间", '<input class="input" type="datetime-local" name="startAt" value="' + esc(e.startAt) + '">') +
         field("结束时间", '<input class="input" type="datetime-local" name="endAt" value="' + esc(e.endAt || "") + '">', "", "可留空；填了会显示成 14:00-17:00") +
@@ -236,7 +236,7 @@
         field("公司 / 档口", '<select name="f_company">' + opts(FIELD_MODES, e.fields.company) + "</select>") +
         field("项目 / 需求", '<select name="f_project">' + opts(FIELD_MODES, e.fields.project) + "</select>") +
         '<div class="dsection full">主办与组织单位</div>' +
-        field("主办方", '<input class="input" name="host" value="' + esc(e.host == null ? "义乌AI圈" : e.host) + '" maxlength="30" placeholder="义乌AI圈">', "full", "显示在报名页，并作为邀请函的落款（××× 敬邀）") +
+        field("主办方", '<input class="input" name="host" value="' + esc(e.host || "") + '" maxlength="30" placeholder="如：义乌市库存品行业协会">', "full", "显示在报名页、同意书和海报顶部，并作为邀请函的落款（××× 敬邀）") +
         field("组织单位", repeater("orgs", orgRows) +
           '<datalist id="evOrgLabels">' + ORG_LABELS.map(function (l) { return '<option value="' + l + '">'; }).join("") + "</datalist>", "full",
           "身份可以自己写，如指导单位、协办单位、赞助方；每类最多 12 个单位，没填单位的行不保存。显示在报名页、邀请函和长图海报上") +

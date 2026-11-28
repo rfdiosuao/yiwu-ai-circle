@@ -1,5 +1,5 @@
 /* ==========================================================================
-   义乌AI圈 · 活动报名页（/e/<slug>）
+   活动报名页（/e/<slug>）。独立页面：不放平台名称和 Logo，不链到站内其他页面
    一张海报，点「立即报名」翻到背面填表。与主站同一套颜色：暖白、墨黑、朱红。
    ========================================================================== */
 
@@ -785,3 +785,27 @@ html.inv-lock, html.inv-lock body { overflow: hidden; }
   .ev__textbtn:hover { color: var(--ink); background: rgba(23, 21, 15, 0.05); }
 }
 .ev__field input[readonly] { background: rgba(23, 21, 15, 0.04); color: var(--ink-66); }
+
+/* ---------- 个人信息说明（页面内展开，不跳转） ---------- */
+.ev__inline {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.ev__consent .ev__inline { justify-self: start; margin-left: 32px; font-size: 0.875rem; color: var(--ink-66); }
+.ev__privacy {
+  margin-top: 18px;
+  border-radius: 12px;
+  background: rgba(23, 21, 15, 0.04);
+  font-size: 0.8125rem;
+  color: var(--ink-66);
+}
+.ev__privacy summary { min-height: 44px; display: flex; align-items: center; padding: 0 14px; cursor: pointer; font-weight: 600; color: var(--ink); }
+.ev__privacy ul { margin: 0; padding: 0 14px 14px 30px; display: grid; gap: 6px; }
+.ev__privacy b { color: var(--ink); }

@@ -1,5 +1,5 @@
 /* ==========================================================================
-   义乌AI圈 · 活动报名页
+   活动报名页（独立页面：不放平台名称和 Logo，不链到其他页面）
    扫码打开 /e/<slug>：正面海报，点「立即报名」翻到背面填表，提交即成为客资。
    报名表可以留邮箱：报名成功后服务端把邀请函发到这个邮箱（页面上只显示「报名成功」）。
    已登录的会员不用填表：资料从账号带出来，必填项都有就直接「一键报名」，手机号用账号里验证过的。
@@ -583,8 +583,24 @@
     }
   }
 
+  /* 同意书和个人信息说明里写主办方的名字；页面上不出现平台名称，也不链到别的页面 */
+  function paintOrgName() {
+    var org = String(ev.host || "").trim() || "主办方";
+    Array.prototype.forEach.call(document.querySelectorAll("[data-org-name]"), function (el) { el.textContent = org; });
+    $("[data-privacy-contact]").textContent = ev.contact ? "（报名咨询：" + ev.contact + "）" : "";
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll("[data-privacy-open]"), function (b) {
+    b.addEventListener("click", function () {
+      var box = $("[data-privacy]");
+      box.open = true;
+      box.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+    });
+  });
+
   function render() {
     document.title = ev.title + " · 活动报名";
+    paintOrgName();
     root.dataset.state = "ready";
     $("[data-preview]").hidden = ev.state !== "draft";
 
@@ -639,7 +655,7 @@
   function missing() {
     root.dataset.state = "missing";
     $("[data-missing]").hidden = false;
-    document.title = "活动不存在 · 义乌AI圈";
+    document.title = "活动不存在";
   }
 
   front.inert = false;
