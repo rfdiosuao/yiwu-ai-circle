@@ -1547,7 +1547,7 @@ function publicBase(req) {
 }
 const eventsModule = installEvents({
   route, db, store, sendJSON, fail, withBody, isAdmin, audit, rateLimited, clientIp, isValidPhone, str,
-  dataDir: DATA_DIR, publicBase, mailer
+  dataDir: DATA_DIR, publicBase, mailer, currentUser
 });
 installPartners({ route, db, store, sendJSON, fail, withBody, isAdmin, audit, str, uploadUrl: eventsModule.uploadUrl });
 

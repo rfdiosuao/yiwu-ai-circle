@@ -492,3 +492,46 @@ test("without SMTP nothing is mailed, and production refuses plaintext SMTP", as
   assert.equal(code, 1);
   assert.match(out, /SMTP_SECURE=ssl or starttls/);
 });
+
+test("logged-in members sign up with their verified phone and their details carry over to the next event", async t => {
+  const app = await start(t);
+  const fields = { name: "required", email: "optional", company: "optional", project: "optional" };
+  const first = await createEvent(app, { fields });
+  const second = await createEvent(app, { title: "下一场对接会", fields });
+
+  const anon = await app.request("GET", "/api/events/" + first.slug + "/me");
+  assert.equal(anon.status, 200);
+  assert.equal(anon.data.member, null, "anonymous visitors just get the normal form");
+  assert.equal((await app.request("POST", "/api/events/" + first.slug + "/register", { account: true, name: "陈总", consent: true })).status, 401);
+
+  const phone = "13800138031";
+  const otp = await app.request("POST", "/api/auth/send", { phone });
+  const login = await app.request("POST", "/api/auth/session", { phone, code: otp.data.demoCode });
+  assert.equal(login.status, 200);
+  const cookie = login.cookie;
+
+  const me = (await app.request("GET", "/api/events/" + first.slug + "/me", undefined, cookie)).data;
+  assert.equal(me.member.phone, "138****8031", "the page only sees a masked phone");
+  assert.equal(me.member.name, "", "the auto-generated nickname is not used as a salutation");
+  await app.request("PATCH", "/api/auth/me", { nickname: "陈老板" }, cookie);
+  assert.equal((await app.request("GET", "/api/events/" + first.slug + "/me", undefined, cookie)).data.member.name, "陈老板", "a nickname the member chose is used");
+  assert.equal(me.lead, null);
+
+  /* 用账号报名：手机号以账号为准，前端传的手机号被忽略 */
+  const reg = await app.request("POST", "/api/events/" + first.slug + "/register",
+    { account: true, phone: "13900009999", name: "陈总", email: "chen@example.com", company: "示例文具厂", consent: true }, cookie);
+  assert.equal(reg.status, 200);
+  const leads = (await app.request("GET", "/api/admin/leads?event=" + first.id, undefined, app.admin)).data.leads;
+  assert.deepEqual(leads.map(l => l.phone), [phone]);
+
+  const again = (await app.request("GET", "/api/events/" + first.slug + "/me", undefined, cookie)).data;
+  assert.deepEqual(again.lead, { name: "陈总", email: "chen@example.com", company: "示例文具厂", project: "" });
+
+  const next = (await app.request("GET", "/api/events/" + second.slug + "/me", undefined, cookie)).data;
+  assert.deepEqual([next.member.name, next.member.email, next.member.company], ["陈总", "chen@example.com", "示例文具厂"], "details carry over");
+  assert.equal(next.lead, null);
+
+  /* 登录了但替别人报名（填了别的手机号、不用账号）：不改自己账号里的资料 */
+  await app.request("POST", "/api/events/" + second.slug + "/register", { phone: "13900009999", name: "同事小王", consent: true }, cookie);
+  assert.equal((await app.request("GET", "/api/events/" + second.slug + "/me", undefined, cookie)).data.member.name, "陈总");
+});

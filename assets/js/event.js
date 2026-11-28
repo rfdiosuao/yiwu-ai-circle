@@ -2,6 +2,7 @@
    义乌AI圈 · 活动报名页
    扫码打开 /e/<slug>：正面海报，点「立即报名」翻到背面填表，提交即成为客资。
    报名表可以留邮箱：报名成功后服务端把邀请函发到这个邮箱（页面上只显示「报名成功」）。
+   已登录的会员不用填表：资料从账号带出来，必填项都有就直接「一键报名」，手机号用账号里验证过的。
    /e/<slug>?invite=letter 是邀请函的在线版（邮件里的「在线查看邀请函」也指向这里）；
    /e/<slug>?poster=1 生成用来转发的科技蓝长图海报。图都由 assets/js/invite.js、invite-tech.js 画。
    ========================================================================== */
@@ -33,6 +34,8 @@
   var MUSIC_KEY = "ywai.ev.music." + slug;
   var ev = null;
   var flipped = false;
+  var member = null;       /* 已登录会员的报名资料：{ phone（打码）, name, email, company } */
+  var memberMode = false;  /* 用登录账号报名：手机号不可改，以账号为准 */
 
   var FIELD_LABEL = { name: "称呼", phone: "手机号", email: "邮箱", company: "公司 / 档口", project: "项目 / 需求" };
   var FIELDS = ["name", "phone", "email", "company", "project", "consent"];
@@ -181,6 +184,9 @@
   /* ---------------- 表单 ---------------- */
   function fieldInput(key) { return form.querySelector('[name="' + key + '"]'); }
 
+  /* 旧活动没有「邮箱」这一项的设置，按不收集处理 */
+  function fieldMode(key) { return (ev && ev.fields && ev.fields[key]) || (key === "email" ? "off" : "optional"); }
+
   function setError(key, msg) {
     var input = fieldInput(key);
     var err = document.getElementById("f-" + key + "-err");
@@ -198,8 +204,9 @@
 
   function readForm() {
     return {
+      account: memberMode,
       name: fieldInput("name").value.trim(),
-      phone: fieldInput("phone").value.replace(/[\s-]/g, ""),
+      phone: memberMode ? "" : fieldInput("phone").value.replace(/[\s-]/g, ""),
       email: fieldInput("email").value.trim(),
       company: fieldInput("company").value.trim(),
       project: fieldInput("project").value.trim(),
@@ -209,7 +216,7 @@
 
   function validate(v) {
     var errors = {};
-    if (!/^1[3-9]\d{9}$/.test(v.phone)) errors.phone = "请输入 11 位手机号";
+    if (!v.account && !/^1[3-9]\d{9}$/.test(v.phone)) errors.phone = "请输入 11 位手机号";
     ["name", "email", "company", "project"].forEach(function (k) {
       if (ev.fields[k] === "required" && !v[k]) errors[k] = "请填写" + FIELD_LABEL[k];
     });
@@ -241,27 +248,114 @@
     var v = readForm();
     var errors = validate(v);
     if (Object.keys(errors).length) { showErrors(errors); return; }
+    submitSignup(v, submitBtn, $("[data-form-error]"));
+  });
 
-    submitBtn.disabled = true;
-    submitBtn.textContent = "提交中…";
+  function submitSignup(v, btn, errEl) {
+    var label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "提交中…";
     api("POST", "/api/events/" + encodeURIComponent(slug) + "/register", v).then(function (r) {
-      submitBtn.disabled = false;
-      submitBtn.textContent = "提交报名";
+      btn.disabled = false;
+      btn.textContent = label;
       if (r.ok) {
         try {
-          localStorage.setItem(STORE_KEY, JSON.stringify({ name: v.name, phone: v.phone, email: v.email, company: v.company, project: v.project, at: Date.now() }));
+          localStorage.setItem(STORE_KEY, JSON.stringify({
+            name: v.name, phone: v.account && member ? member.phone : v.phone, email: v.email, company: v.company, project: v.project, at: Date.now()
+          }));
         } catch (err) {}
+        if (member) ["name", "email", "company"].forEach(function (k) { if (v[k]) member[k] = v[k]; });
         showDone(r.updated, r.mail === "queued" ? v.email : "");
         return;
       }
-      if (r.errors) { showErrors(r.errors); return; }
+      if (r.errors) { showMemberCard(false); showErrors(r.errors); return; }
       if (r.error && /^event_/.test(r.error)) {
         ev.state = r.error.replace("event_", "");
         paintState();
         return;
       }
-      $("[data-form-error]").textContent = r.message || "提交失败，请稍后再试";
+      if (r.status === 401 && v.account) {
+        /* 登录过期：退回普通表单，自己填手机号 */
+        leaveMemberMode();
+        $("[data-form-error]").textContent = r.message || "登录已过期，请填写手机号后提交";
+        return;
+      }
+      errEl.textContent = r.message || "提交失败，请稍后再试";
     });
+  }
+
+  /* ---------------- 已登录会员：资料自动带出，一键报名 ---------------- */
+  function memberValue(k) { return fieldMode(k) === "off" ? "" : (member && member[k]) || ""; }
+
+  /* 这场活动的必填项是不是都能从账号资料里带出来 */
+  function memberComplete() {
+    return ["name", "email", "company", "project"].every(function (k) {
+      return fieldMode(k) !== "required" || memberValue(k);
+    });
+  }
+
+  function showMemberCard(on) {
+    $("[data-member]").hidden = !on;
+    $("[data-fields]").hidden = on;
+  }
+
+  function applyMember() {
+    var phone = fieldInput("phone");
+    phone.value = member.phone;
+    phone.readOnly = true;
+    phone.required = false;
+    $("[data-phone-hint]").hidden = false;
+    $("[data-phone-tag]").textContent = "已登录";
+    var s = saved() || {};
+    ["name", "email", "company"].forEach(function (k) {
+      var input = fieldInput(k);
+      if (!input.value) input.value = s[k] || memberValue(k);
+    });
+    $("[data-member-info]").innerHTML = [["称呼", memberValue("name")], ["手机号", member.phone], ["邮箱", memberValue("email")], ["公司 / 档口", memberValue("company")]]
+      .filter(function (r) { return r[1]; })
+      .map(function (r) { return "<dt>" + esc(r[0]) + "</dt><dd>" + esc(r[1]) + "</dd>"; }).join("");
+    showMemberCard(memberComplete());
+  }
+
+  function leaveMemberMode() {
+    memberMode = false;
+    var phone = fieldInput("phone");
+    phone.readOnly = false;
+    phone.required = true;
+    phone.value = "";
+    $("[data-phone-hint]").hidden = true;
+    $("[data-phone-tag]").textContent = "必填";
+    showMemberCard(false);
+  }
+
+  function loadMember() {
+    api("GET", "/api/events/" + encodeURIComponent(slug) + "/me").then(function (r) {
+      if (!r.ok || !r.member) return;
+      member = r.member;
+      memberMode = true;
+      /* 这个账号已经报过名（比如换了手机或清了缓存）：照样显示「你已报名」 */
+      if (r.lead && !saved()) {
+        try { localStorage.setItem(STORE_KEY, JSON.stringify(Object.assign({ phone: member.phone, at: Date.now() }, r.lead))); } catch (err) {}
+      }
+      applyMember();
+      paintState();
+    });
+  }
+
+  $("[data-quick]").addEventListener("click", function () {
+    $("[data-quick-error]").textContent = "";
+    if (ev.state === "draft") {
+      $("[data-quick-error]").textContent = "预览模式不能提交。请在后台把活动状态改为「报名中」。";
+      return;
+    }
+    submitSignup({
+      account: true, name: memberValue("name"), email: memberValue("email"), company: memberValue("company"), project: "", consent: true
+    }, $("[data-quick]"), $("[data-quick-error]"));
+  });
+
+  $("[data-member-edit]").addEventListener("click", function () {
+    showMemberCard(false);
+    fieldInput(fieldMode("name") === "off" ? "email" : "name").focus();
   });
 
   /* mailedTo：这次提交后邀请函发往的邮箱（没发就是空） */
@@ -281,7 +375,9 @@
 
   $("[data-edit]").addEventListener("click", function () {
     var s = saved() || {};
-    ["name", "phone", "email", "company", "project"].forEach(function (k) { if (s[k]) fieldInput(k).value = s[k]; });
+    ["name", "email", "company", "project"].forEach(function (k) { if (s[k]) fieldInput(k).value = s[k]; });
+    if (!memberMode && s.phone) fieldInput("phone").value = s.phone;
+    showMemberCard(false);
     $("[data-done]").hidden = true;
     form.hidden = false;
     fieldInput(ev.fields.name === "off" ? "phone" : "name").focus();
@@ -517,8 +613,7 @@
     paintMore();
 
     ["name", "email", "company", "project"].forEach(function (k) {
-      /* 旧活动没有「邮箱」这一项的设置，按不收集处理 */
-      var mode = ev.fields[k] || (k === "email" ? "off" : "optional");
+      var mode = fieldMode(k);
       var wrap = form.querySelector('[data-field="' + k + '"]');
       wrap.hidden = mode === "off";
       var input = fieldInput(k);
@@ -535,6 +630,7 @@
       startMusic();
     }
     paintState();
+    loadMember();
     $("[data-email-hint]").hidden = !ev.mailInvite;
     if (params.get("poster")) openInvite("poster");
     else if (ev.invite && params.get("invite")) openInvite("letter");

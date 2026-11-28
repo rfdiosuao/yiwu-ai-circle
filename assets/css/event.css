@@ -745,3 +745,43 @@ html.inv-lock, html.inv-lock body { overflow: hidden; }
 @media (hover: hover) {
   .inv--tech .inv__close:hover { background: rgba(127, 216, 255, 0.12); }
 }
+
+/* ---------- 已登录会员：一键报名 ---------- */
+.ev__fields { display: grid; gap: 16px; }
+.ev__member {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: 0 0 0 1px var(--line), 0 12px 30px -18px rgba(23, 21, 15, 0.3);
+}
+.ev__member-kicker { font-weight: 700; font-size: 0.9375rem; }
+.ev__member-info {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 14px;
+  font-size: 0.9375rem;
+}
+.ev__member-info dt { color: var(--ink-66); }
+.ev__member-info dd { margin: 0; overflow-wrap: anywhere; }
+.ev__member-note { font-size: 0.8125rem; color: var(--ink-66); }
+.ev__member-note a { color: var(--ink); text-underline-offset: 3px; }
+.ev__textbtn {
+  justify-self: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-66);
+  font-size: 0.9375rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .ev__textbtn:hover { color: var(--ink); background: rgba(23, 21, 15, 0.05); }
+}
+.ev__field input[readonly] { background: rgba(23, 21, 15, 0.04); color: var(--ink-66); }
