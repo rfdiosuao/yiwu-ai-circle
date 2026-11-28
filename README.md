@@ -68,6 +68,14 @@ npm start
 
 `deploy/` 里是现成的配置：`yiwu-ai-circle.service`（systemd）、`Caddyfile`（自动 HTTPS）、`env.example`（生产配置模板）。
 
+**服务器上已经有 nginx 和别的网站时**，用一键脚本 `deploy/install.sh`（root 运行）。它只新增、不改动已有站点：自带 Node.js 装在 `/opt/yiwu-ai-circle/runtime`，数据放 `/var/lib/yiwu-ai-circle`，配置和随机生成的密钥放 `/etc/yiwu-ai-circle/env`；nginx 里只加一个只匹配本域名的 `zz-<域名>.conf`，改之前和之后对比已有站点的访问结果，有变化就自动撤回。域名已解析到本机时自动申请 Let's Encrypt 证书（用已有的 certbot / acme.sh，没有就装 certbot）；还没解析就先用 HTTP，解析后再运行一次。以后更新代码也是再运行一次。
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/rfdiosuao/yiwu-ai-circle/main/deploy/install.sh -o yiwu-install.sh && bash yiwu-install.sh
+```
+
+服务器上只有这一个网站时，也可以按下面的步骤用 Caddy：
+
 1. 域名 A 记录指向服务器 IP；服务器在中国大陆的，域名要先备案。防火墙 / 安全组只对外开放 22、80、443。
 2. 安装 Node.js 20 以上和 Caddy。项目没有第三方依赖，不用 `npm install`。
 3. 建运行用户和目录：`useradd --system --home /var/lib/yiwu-ai-circle yiwu`，代码放 `/opt/yiwu-ai-circle`，数据目录 `/var/lib/yiwu-ai-circle` 归 `yiwu` 所有。
