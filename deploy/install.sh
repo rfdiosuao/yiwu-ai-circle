@@ -258,7 +258,7 @@ printf '%s\n' "$NGINX_T" | grep -q -E 'listen[[:space:]]+\[::\]:443' && V6_443="
 
 proxy_block() {
   cat <<EOF
-    client_max_body_size 20m;
+    client_max_body_size 50m;
     location ^~ /.well-known/acme-challenge/ {
         root $ACME;
         default_type text/plain;
